@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WEB 55 PANEL</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body{
+  margin:0;
+  background:#0d0d0f;
+  color:white;
+  font-family:Arial, sans-serif;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ======== STAT BAR ======== */
+.stat-bar{
+  display:flex;
+  gap:6px;
+  padding:5px 8px;
+  background:#141418;
+  border-bottom:1px solid #1e1e28;
+  flex-wrap:wrap;
+  align-items:center;
+  flex-shrink:0;
+}
+
+.stat-card{
+  background:#1e1e26;
+  border:1px solid #2a2a38;
+  border-radius:7px;
+  padding:3px 9px;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:12px;
+  white-space:nowrap;
+}
+
+.stat-card .label{ color:#666; font-size:10px; }
+.stat-card .value{ font-weight:bold; font-size:13px; }
+.stat-card.win-rate .value { color:#00e676; }
+.stat-card.streak-win .value { color:#ffeb3b; }
+.stat-card.streak-lose .value { color:#ff5252; }
+.stat-card.total .value { color:#80d8ff; }
+.stat-card.pola .value { color:#ce93d8; font-size:11px; }
+.stat-card.suggest .value { font-size:12px; }
+.stat-card.suggest.besar { border-color:#1565c0; background:#0d1a33; }
+.stat-card.suggest.kecil { border-color:#b71c1c; background:#2d0a0a; }
+
+/* ======== TREND DOTS ======== */
+.trend-bar{
+  padding:3px 8px;
+  background:#111115;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  overflow-x:auto;
+  border-bottom:1px solid #1a1a22;
+  min-height:24px;
+  flex-shrink:0;
+}
+
+.trend-bar .tlabel{
+  font-size:10px;
+  color:#444;
+  margin-right:3px;
+  flex-shrink:0;
+}
+
+.dot{
+  width:13px;
+  height:13px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+.dot.besar{ background:#1565c0; box-shadow:0 0 4px #1976d2; }
+.dot.kecil{ background:#c62828; box-shadow:0 0 4px #e53935; }
+.dot.pending{ background:#2a2a35; }
+
+/* ======== PANEL TABEL ======== */
+.panel{
+  flex:0 0 auto;
+  max-height:26vh;
+  background:#141418;
+  overflow-y:auto;
+  padding:0 6px 4px;
+}
+
+.web55{
+  flex:1 1 auto;
+  min-height:0;
+}
+
+iframe{
+  width:100%;
+  height:100%;
+  border:none;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+
+th,td{
+  border:1px solid #1e1e28;
+  padding:5px 6px;
+  text-align:center;
+}
+
+th{
+  background:#1a1a22;
+  color:#aaa;
+  font-size:11px;
+  position:sticky;
+  top:0;
+  z-index:1;
+}
+
+tr:hover td { background:#1c1c24; }
+
+.win{ color:#00e676; font-weight:bold; }
+.lose{ color:#ff5252; font-weight:bold; }
+td.pred-besar { color:#64b5f6; }
+td.pred-kecil { color:#ef9a9a; }
+</style>
+</head>
+
+<body>
+
+<!-- STAT BAR -->
+<div class="stat-bar">
+  <div class="stat-card win-rate">
+    <span class="label">📊 Win Rate</span>
+    <span class="value" id="sWinRate">-</span>
+  </div>
+  <div class="stat-card total">
+    <span class="label">🎯 W/L</span>
+    <span class="value" id="sTotal">0W/0L</span>
+  </div>
+  <div class="stat-card" id="sStreakCard">
+    <span class="label">🔥 Streak</span>
+    <span class="value" id="sStreak">-</span>
+  </div>
+  <div class="stat-card pola">
+    <span class="label">📈 Pola</span>
+    <span class="value" id="sPola">-</span>
+  </div>
+  <div class="stat-card suggest" id="sSuggestCard">
+    <span class="label">🤖 Saran</span>
+    <span class="value" id="sSuggest">-</span>
+  </div>
+</div>
+
+<!-- TREND DOTS -->
+<div class="trend-bar" id="trendBar">
+  <span class="tlabel">TREND:</span>
+</div>
+
+<!-- TABLE PANEL -->
+<div class="panel">
+  <table>
+    <thead>
+      <tr>
+        <th>Periode</th>
+        <th>Prediksi</th>
+        <th>Sisa</th>
+        <th>Hasil</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="dataBody"></tbody>
+  </table>
+</div>
+
+<div class="web55">
+  <iframe src="https://55x4mqd.com/#/home/"></iframe>
+</div>
+
+<script>
+
+let currentRow = null;
+let timer = null;
+let lastPeriode = null;   // periode berjalan (angka, mis. 51792)
+let lastSisa = null;
+
+// history hasil yang sudah selesai, terbaru di indeks 0
+let hasilHistory = [];
+let totalWin = 0;
+let totalLose = 0;
+
+function kategori(num){
+  return num <= 4 ? "Kecil" : "Besar";
+}
+
+// ======== PREDIKSI CERDAS ========
+function buatPrediksi(){
+  const done = hasilHistory.slice(0, 8);
+  if(done.length < 3) return Math.random() > 0.5 ? "Besar" : "Kecil";
+
+  const cats = done.map(h => h.kategori);
+
+  // 1. Streak panjang ≥3 → prediksi balik arah
+  let streak = 1;
+  for(let i = 1; i < cats.length; i++){
+    if(cats[i] === cats[0]) streak++; else break;
+  }
+  if(streak >= 3) return cats[0] === "Besar" ? "Kecil" : "Besar";
+
+  // 2. Alternating ≥4 → lanjutkan pola
+  let isAlt = true;
+  for(let i = 1; i < Math.min(cats.length, 4); i++){
+    if(cats[i] === cats[i-1]){ isAlt = false; break; }
+  }
+  if(isAlt && cats.length >= 4) return cats[0] === "Besar" ? "Kecil" : "Besar";
+
+  // 3. Dominan ≥70% dari 8 → prediksi yang jarang
+  const besarCount = cats.filter(c => c === "Besar").length;
+  const ratio = besarCount / cats.length;
+  if(ratio >= 0.7) return "Kecil";
+  if(ratio <= 0.3) return "Besar";
+
+  // 4. Momentum: ikuti hasil terakhir
+  return cats[0];
+}
+
+// ======== DETEKSI POLA ========
+function deteksiPola(cats){
+  if(cats.length < 2) return "-";
+
+  let streak = 1;
+  for(let i = 1; i < cats.length; i++){
+    if(cats[i] === cats[0]) streak++; else break;
+  }
+  if(streak >= 3) return cats[0] + " x" + streak;
+
+  let isAlt = true;
+  for(let i = 1; i < Math.min(cats.length, 4); i++){
+    if(cats[i] === cats[i-1]){ isAlt = false; break; }
+  }
+  if(isAlt && cats.length >= 4) return "Alternating";
+
+  const b = cats.filter(c => c === "Besar").length;
+  const ratio = b / cats.length;
+  if(ratio >= 0.7) return "Besar " + Math.round(ratio*100) + "%";
+  if(ratio <= 0.3) return "Kecil " + Math.round((1-ratio)*100) + "%";
+  return "Mix";
+}
+
+// ======== UPDATE STAT BAR ========
+function updateStatBar(){
+  const total = totalWin + totalLose;
+  const wr = total === 0 ? "-" : Math.round(totalWin / total * 100) + "%";
+  document.getElementById("sWinRate").innerText = wr;
+  document.getElementById("sTotal").innerText = totalWin + "W/" + totalLose + "L";
+
+  // Streak dari tabel DOM
+  const streakCard = document.getElementById("sStreakCard");
+  const streakEl = document.getElementById("sStreak");
+  const doneRows = Array.from(document.querySelectorAll("#dataBody tr[data-done='1']"));
+  if(doneRows.length > 0){
+    const statuses = doneRows.map(tr => tr.querySelector(".status").innerText);
+    let streak = 1;
+    const cur = statuses[0];
+    for(let i = 1; i < statuses.length; i++){
+      if(statuses[i] === cur) streak++; else break;
+    }
+    streakEl.innerText = streak + "x " + cur;
+    streakCard.className = "stat-card " + (cur === "WIN" ? "streak-win" : "streak-lose");
+  }
+
+  // Pola
+  const cats = hasilHistory.slice(0, 8).map(h => h.kategori);
+  document.getElementById("sPola").innerText = deteksiPola(cats);
+
+  // Saran
+  const saran = buatPrediksi();
+  document.getElementById("sSuggest").innerText = saran;
+  document.getElementById("sSuggestCard").className = "stat-card suggest " + saran.toLowerCase();
+}
+
+// ======== UPDATE TREND DOTS ========
+function updateTrendDots(){
+  const bar = document.getElementById("trendBar");
+  bar.querySelectorAll(".dot").forEach(d => d.remove());
+
+  const rows = Array.from(document.querySelectorAll("#dataBody tr")).slice(0, 15).reverse();
+  rows.forEach(tr => {
+    const dot = document.createElement("div");
+    dot.className = "dot";
+    const hasil = tr.querySelector(".hasil").innerText;
+    if(!hasil || hasil === "-"){
+      dot.classList.add("pending");
+    } else if(hasil.startsWith("Besar")){
+      dot.classList.add("besar");
+      dot.title = "Besar - " + tr.dataset.periode;
+    } else {
+      dot.classList.add("kecil");
+      dot.title = "Kecil - " + tr.dataset.periode;
+    }
+    bar.appendChild(dot);
+  });
+}
+
+async function ambilAPI(){
+  try{
+    const res = await fetch("/api?t=" + Date.now());
+    return await res.json();
+  }catch(e){
+    console.log("API ERROR:", e);
+    return null;
+  }
+}
+
+function tambahBaris(periode){
+  const tbody = document.getElementById("dataBody");
+  const p = String(periode);
+  if(tbody.firstChild && tbody.firstChild.dataset.periode === p) return;
+  const prediksi = buatPrediksi();
+  const predClass = prediksi === "Besar" ? "pred-besar" : "pred-kecil";
+  const tr = document.createElement("tr");
+  tr.dataset.periode = p;
+  tr.dataset.done = "0";
+  tr.innerHTML = `
+    <td>${p}</td>
+    <td class="${predClass}">${prediksi}</td>
+    <td class="count">-</td>
+    <td class="hasil">-</td>
+    <td class="status">-</td>
+  `;
+  tbody.insertBefore(tr, tbody.firstChild);
+  while(tbody.children.length > 30) tbody.removeChild(tbody.lastChild);
+  currentRow = tr;
+  updateTrendDots();
+  updateStatBar();
+}
+
+function isiHasil(tr, hasil){
+  if(!tr || tr.dataset.done === "1") return;
+  tr.dataset.done = "1";
+  const kat = kategori(hasil);
+  tr.querySelector(".hasil").innerText = kat + " " + hasil;
+  const statusCell = tr.querySelector(".status");
+  const prediksi = tr.children[1].innerText;
+  if(prediksi === kat){
+    statusCell.innerText = "WIN";
+    statusCell.className = "status win";
+    totalWin++;
+  } else {
+    statusCell.innerText = "LOSE";
+    statusCell.className = "status lose";
+    totalLose++;
+  }
+  hasilHistory.unshift({ kategori: kat, angka: hasil });
+  if(hasilHistory.length > 30) hasilHistory.pop();
+  updateStatBar();
+  updateTrendDots();
+}
+
+// cocokkan hasil dari API ke baris yang periodenya sesuai
+function cocokkanHasil(list){
+  if(!Array.isArray(list)) return;
+  document.querySelectorAll("#dataBody tr").forEach(tr => {
+    if(tr.dataset.done === "1") return;
+    const found = list.find(e => String(e.issueNumber).slice(-5) === tr.dataset.periode);
+    // gunakan found.hasil (sudah di-parse oleh API, digit terakhir yang benar)
+    if(found) isiHasil(tr, found.hasil);
+  });
+}
+
+async function cekData(){
+  const data = await ambilAPI();
+  if(!data || data.error) return;
+  cocokkanHasil(data.list);
+  // sinkronisasi periode dari API: hanya update bila API melaporkan periode LEBIH BARU
+  // (bukan sama dengan lastPeriode yang sudah di-increment lokal)
+  const apiP = parseInt(data.periode, 10);
+  if(!isNaN(apiP) && lastPeriode !== null && apiP > lastPeriode){
+    lastPeriode = apiP;
+    tambahBaris(apiP);
+  }
+}
+
+function mulaiCountdown(){
+  clearInterval(timer);
+  timer = setInterval(() => {
+    const now = new Date();
+    const sec = now.getSeconds();
+
+    // countdown sinkron 30 detik: sisa waktu sampai periode berikutnya
+    // sec=0  → sisa=30, sec=1 → sisa=29, ..., sec=29 → sisa=1
+    const sisa = 30 - (sec % 30);
+
+    // Deteksi pergantian periode: ketika lastSisa kecil (≤3) lalu tiba-tiba jadi 30
+    // Ini berarti countdown habis dan periode baru dimulai
+    if(lastSisa !== null && lastSisa <= 3 && sisa === 30 && lastPeriode !== null){
+      lastPeriode++;
+      tambahBaris(lastPeriode);
+    }
+    lastSisa = sisa;
+
+    if(currentRow){
+      // tampilkan countdown; saat sisa=30 artinya baru mulai (30 detik penuh)
+      currentRow.querySelector(".count").innerText = sisa;
+    }
+
+    // cek hasil tiap 2 detik
+    if(sec % 2 === 0) cekData();
+  },1000);
+}
+
+async function start(){
+  const data = await ambilAPI();
+  if(!data || data.error) return;
+  lastPeriode = parseInt(data.periode, 10);
+  tambahBaris(lastPeriode);
+  cocokkanHasil(data.list);
+  updateStatBar();
+  mulaiCountdown();
+}
+
+start();
+
+</script>
+
+</body>
+</html>
