@@ -263,117 +263,131 @@ function kategori(num){
   return num <= 4 ? "Kecil" : "Besar";
 }
 
-// ======== MULTI-ENGINE PATTERN RECOGNITION ========
+// ======== SISTEM KONSENSUS MULTI-INDIKATOR (AI ENSEMBLE) ========
 function analisisPrediksi(){
-  if(hasilHistory.length < 2){
+  if(hasilHistory.length < 3){
     return {
       tebakan: "Besar",
       pola: "Memuat Data...",
       confidence: 50,
       signal: "WAIT",
-      signalText: "ANALISIS..."
+      signalText: "MENGANALISIS..."
     };
   }
 
   const cats = hasilHistory.map(h => h.kategori);
+  const nums = hasilHistory.map(h => h.angka);
 
-  // 1. ENGINE NAGA (Trend Following)
-  // Pantang potong naga: Ikuti arus naga sampai putus!
+  // 1. ENGINE NAGA SEJATI (Streak >= 3)
+  // Pantang potong naga yang sudah matang (>= 3 kali beruntun)!
   let streak = 1;
   for(let i = 1; i < cats.length; i++){
     if(cats[i] === cats[0]) streak++;
     else break;
   }
 
-  if(streak >= 2){
+  if(streak >= 3){
     return {
       tebakan: cats[0],
-      pola: "Naga " + cats[0] + " x" + streak,
-      confidence: Math.min(70 + streak * 5, 92),
+      pola: "🔥 Naga " + cats[0] + " (" + streak + "x)",
+      confidence: Math.min(76 + streak * 4, 94),
       signal: "STRONG",
       signalText: "IKUTI NAGA (" + streak + "x)"
     };
   }
 
-  // 2. ENGINE PING-PONG (Selang-Seling B-K-B-K)
-  let isAlt = true;
-  const altLen = Math.min(cats.length, 5);
-  for(let i = 1; i < altLen; i++){
-    if(cats[i] === cats[i-1]){
-      isAlt = false;
-      break;
-    }
+  // 2. ENGINE PING-PONG FLEKSIBEL (Selang-Seling Aktif >= 3)
+  // Hitung berapa kali pergantian selang-seling terjadi di deret terdepan
+  let altCount = 1;
+  for(let i = 1; i < cats.length; i++){
+    if(cats[i] !== cats[i-1]) altCount++;
+    else break;
   }
 
-  if(isAlt && altLen >= 3){
+  if(altCount >= 3){
     const nextAlt = cats[0] === "Besar" ? "Kecil" : "Besar";
     return {
       tebakan: nextAlt,
-      pola: "Ping-Pong (Selang-Seling)",
-      confidence: 82,
+      pola: "⚡ Ping-Pong (" + altCount + "x)",
+      confidence: Math.min(76 + altCount * 3, 90),
       signal: "STRONG",
-      signalText: "IKUTI PING-PONG"
+      signalText: "IKUTI PING-PONG (" + altCount + "x)"
     };
   }
 
-  // 3. ENGINE DOBEL 2-2 / MIRROR
-  if(cats.length >= 4){
-    // Kasus 3A: [B, K, K] -> K sudah dobel, B baru single -> lengkapi pasangan B
-    if(cats[0] !== cats[1] && cats[1] === cats[2]){
-      return {
-        tebakan: cats[0],
-        pola: "Pasangan Dobel 2-2",
-        confidence: 76,
-        signal: "MEDIUM",
-        signalText: "LENGKAPI DOBEL"
-      };
-    }
+  // 3. ENSEMBLE KONSENSUS MULTI-INDIKATOR (Untuk Pasar Transisi / Non-Naga)
+  let scoreBesar = 0;
+  let scoreKecil = 0;
 
-    // Kasus 3B: [B, B, K, K] -> B sudah dobel, sebelumnya K dobel -> ganti ke K
-    if(cats[0] === cats[1] && cats[2] === cats[3] && cats[0] !== cats[2]){
-      const nextPair = cats[0] === "Besar" ? "Kecil" : "Besar";
-      return {
-        tebakan: nextPair,
-        pola: "Ganti Dobel 2-2",
-        confidence: 74,
-        signal: "MEDIUM",
-        signalText: "GANTI PASANGAN"
-      };
+  // Indikator A: Weighted Moving Average (WMA 4 Angka Terakhir)
+  const w = [4, 3, 2, 1];
+  let wSum = 0, wTotal = 0;
+  for(let i = 0; i < Math.min(nums.length, 4); i++){
+    wSum += nums[i] * w[i];
+    wTotal += w[i];
+  }
+  const wma = wSum / wTotal;
+  if(wma >= 5.5) scoreBesar += 3.0;
+  else if(wma >= 4.7) scoreBesar += 1.5;
+  else if(wma <= 3.5) scoreKecil += 3.0;
+  else if(wma <= 4.3) scoreKecil += 1.5;
+
+  // Indikator B: Dominansi Rolling 7 Periode
+  const slice7 = cats.slice(0, 7);
+  const b7 = slice7.filter(c => c === "Besar").length;
+  const k7 = slice7.length - b7;
+  if(b7 >= 5) scoreBesar += 2.5;
+  else if(k7 >= 5) scoreKecil += 2.5;
+  else if(b7 > k7) scoreBesar += 1.0;
+  else if(k7 > b7) scoreKecil += 1.0;
+
+  // Indikator C: Gravitasi Nilai Ekstrem
+  // Jika angka terakhir 9 (maksimum), tekanan koreksi ke bawah tinggi
+  // Jika angka terakhir 0 (minimum), tekanan koreksi ke atas tinggi
+  if(nums[0] === 9) scoreKecil += 1.5;
+  else if(nums[0] === 0) scoreBesar += 1.5;
+  else if(nums[0] >= 7) scoreBesar += 0.8;
+  else if(nums[0] <= 2) scoreKecil += 0.8;
+
+  // Indikator D: Dinamika Pasangan Kembar 2x
+  if(streak === 2){
+    // Pada pair 2x, sering terjadi pembalikan (cut) kecuali didukung WMA kuat
+    if(cats[0] === "Besar" && wma < 5.0) scoreKecil += 1.8;
+    else if(cats[0] === "Kecil" && wma > 4.0) scoreBesar += 1.8;
+    else {
+      if(cats[0] === "Besar") scoreBesar += 1.2;
+      else scoreKecil += 1.2;
     }
   }
 
-  // 4. ENGINE MARKOV TRANSITION PROBABILITY (20 Ronde)
-  let toBesar = 0;
-  let toKecil = 0;
-  const recent = cats.slice(0, 20);
+  // HITUNG KONSENSUS
+  const totalScore = scoreBesar + scoreKecil;
+  const isBesar = scoreBesar >= scoreKecil;
+  const winningScore = Math.max(scoreBesar, scoreKecil);
+  const ratio = totalScore > 0 ? winningScore / totalScore : 0.5;
+  const conf = Math.min(Math.round(52 + ratio * 36), 88);
 
-  for(let i = 0; i < recent.length - 1; i++){
-    if(recent[i+1] === cats[0]){
-      if(recent[i] === "Besar") toBesar++;
-      else toKecil++;
-    }
+  // Filter Keamanan Pasar Acak (Anti-Whipsaw)
+  let signal = "NORMAL";
+  let signalText = "NORMAL (" + (isBesar ? "BESAR" : "KECIL") + ")";
+  let pola = "Konsensus " + (isBesar ? "Besar" : "Kecil");
+
+  if(conf >= 74){
+    signal = "STRONG";
+    signalText = "🔥 SINYAL KUAT (" + (isBesar ? "BESAR" : "KECIL") + ")";
+    pola = "Tren Dominan " + (isBesar ? "Besar" : "Kecil");
+  } else if(conf < 63){
+    signal = "WAIT";
+    signalText = "⚠️ SARAN: SKIP / WAIT";
+    pola = "Pasar Acak (50/50)";
   }
 
-  const totalTrans = toBesar + toKecil;
-  if(totalTrans >= 3 && toBesar !== toKecil){
-    const favorBesar = toBesar > toKecil;
-    const ratio = Math.round((Math.max(toBesar, toKecil) / totalTrans) * 100);
-    return {
-      tebakan: favorBesar ? "Besar" : "Kecil",
-      pola: "Transisi " + (favorBesar ? "B" : "K") + " (" + ratio + "%)",
-      confidence: Math.min(ratio, 80),
-      signal: ratio >= 65 ? "MEDIUM" : "WAIT",
-      signalText: ratio >= 65 ? "TRANSISI KUAT" : "PASAR HATI-HATI"
-    };
-  }
-
-  // 5. DEFAULT MOMENTUM
   return {
-    tebakan: cats[0],
-    pola: "Pasar Acak (Momentum)",
-    confidence: 55,
-    signal: "WAIT",
-    signalText: "WAIT / ACAK"
+    tebakan: isBesar ? "Besar" : "Kecil",
+    pola: pola,
+    confidence: conf,
+    signal: signal,
+    signalText: signalText
   };
 }
 
@@ -582,6 +596,9 @@ function mulaiCountdown(){
 
     // Pergantian periode sinkron 30 detik
     if(lastSisa !== null && lastSisa <= 3 && sisa === 30 && lastPeriode !== null){
+      if(currentRow && currentRow.dataset.done === "0"){
+        currentRow.querySelector(".count").innerText = "Undian...";
+      }
       lastPeriode++;
       tambahBaris(lastPeriode);
     }
