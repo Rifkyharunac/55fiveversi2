@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pageSize: 10,
+          pageSize: 25,
           pageNo: 1,
           typeId: 30,
           language: 0,
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       number: numberString,
       // daftar hasil lengkap biar frontend bisa mencocokkan hasil ke periode yg tepat
       // setiap item sudah include 'hasil' (digit terakhir) agar frontend tidak perlu re-parse
-      list: list.slice(0, 20).map(e => ({
+      list: list.slice(0, 25).map(e => ({
         issueNumber: e.issueNumber,
         number: e.number,
         hasil: parseInt(String(e.number).split(",").pop(), 10),
