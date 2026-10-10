@@ -164,15 +164,21 @@ tr:hover td { background:#181c28; }
 td.pred-besar { color:#82b1ff; font-weight:bold; }
 td.pred-kecil { color:#ff8a80; font-weight:bold; }
 
-.badge-conf{
-  font-size:9px;
-  padding:1px 4px;
-  border-radius:3px;
-  background:#1e2433;
+.badge-level{
+  font-size:10px;
+  font-weight:bold;
+  padding:2px 5px;
+  border-radius:4px;
+  display:inline-block;
 }
-.badge-conf.high{ color:#00e676; }
-.badge-conf.med{ color:#ffb300; }
-.badge-conf.low{ color:#8a94a6; }
+.badge-level.lvl-1{ background:#0b2918; color:#00e676; border:1px solid #00e676; }
+.badge-level.lvl-2{ background:#291e05; color:#ffb300; border:1px solid #ffb300; }
+.badge-level.lvl-3{ background:#290d0d; color:#ff5252; border:1px solid #ff5252; }
+
+.stat-card.level-card .value{ font-size:11px; }
+.stat-card.level-card.lvl-1 .value{ color:#00e676; }
+.stat-card.level-card.lvl-2 .value{ color:#ffb300; }
+.stat-card.level-card.lvl-3 .value{ color:#ff5252; }
 
 .loading-cell{
   padding:16px;
@@ -198,21 +204,17 @@ td.pred-kecil { color:#ff8a80; font-weight:bold; }
     <span class="label">🔥 Streak</span>
     <span class="value" id="sStreak">-</span>
   </div>
-  <div class="stat-card conf">
-    <span class="label">🎯 Conf</span>
-    <span class="value" id="sConf">-</span>
+  <div class="stat-card level-card lvl-1" id="sLevelCard">
+    <span class="label">⚡ Level Sinyal</span>
+    <span class="value" id="sLevel">L1 (Normal)</span>
   </div>
 
   <div class="stat-card pola" style="grid-column:span 2;">
-    <span class="label">📈 Pola Tren</span>
+    <span class="label">📈 Pola Papan Tren</span>
     <span class="value" id="sPola">Menganalisis...</span>
   </div>
-  <div class="stat-card signal strong" id="sSignalCard">
-    <span class="label">⚡ Sinyal</span>
-    <span class="value" id="sSignal">-</span>
-  </div>
   <div class="stat-card suggest" id="sSuggestCard" style="grid-column:span 2;">
-    <span class="label">🤖 Saran Prediksi</span>
+    <span class="label">🤖 Saran Prediksi VIP</span>
     <span class="value" id="sSuggest">-</span>
   </div>
 </div>
@@ -228,10 +230,10 @@ td.pred-kecil { color:#ff8a80; font-weight:bold; }
     <thead>
       <tr>
         <th style="width:20%;">Periode</th>
-        <th style="width:18%;">Prediksi</th>
-        <th style="width:14%;">Conf</th>
-        <th style="width:12%;">Sisa</th>
-        <th style="width:22%;">Hasil</th>
+        <th style="width:20%;">Prediksi</th>
+        <th style="width:14%;">Level</th>
+        <th style="width:14%;">Sisa</th>
+        <th style="width:18%;">Hasil</th>
         <th style="width:14%;">Status</th>
       </tr>
     </thead>
@@ -259,135 +261,69 @@ let hasilHistory = [];
 let totalWin = 0;
 let totalLose = 0;
 
+// Sistem Level Martingale VIP (L1, L2, L3)
+let currentMartingaleLevel = 1;
+
 function kategori(num){
   return num <= 4 ? "Kecil" : "Besar";
 }
 
-// ======== SISTEM KONSENSUS MULTI-INDIKATOR (AI ENSEMBLE) ========
+// ======== ENGINE ADAPTIVE ROAD (PREDIKSI AKURAT TREN & PING-PONG) ========
 function analisisPrediksi(){
-  if(hasilHistory.length < 3){
+  if(hasilHistory.length < 2){
     return {
       tebakan: "Besar",
       pola: "Memuat Data...",
-      confidence: 50,
-      signal: "WAIT",
-      signalText: "MENGANALISIS..."
+      level: currentMartingaleLevel,
+      signalText: "L" + currentMartingaleLevel + " (NORMAL)"
     };
   }
 
   const cats = hasilHistory.map(h => h.kategori);
-  const nums = hasilHistory.map(h => h.angka);
 
-  // 1. ENGINE NAGA SEJATI (Streak >= 3)
-  // Pantang potong naga yang sudah matang (>= 3 kali beruntun)!
+  // 1. ENGINE NAGA & KEMBAR (Streak >= 2)
+  // Di 55five, 67% hasil mengulang sisi sebelumnya (BB / KK / BBB / KKK).
+  // Pantang melawan tren kembar/naga!
   let streak = 1;
   for(let i = 1; i < cats.length; i++){
     if(cats[i] === cats[0]) streak++;
     else break;
   }
 
-  if(streak >= 3){
+  if(streak >= 2){
     return {
-      tebakan: cats[0],
+      tebakan: cats[0], // Lanjutkan tren kembar/naga!
       pola: "🔥 Naga " + cats[0] + " (" + streak + "x)",
-      confidence: Math.min(76 + streak * 4, 94),
-      signal: "STRONG",
-      signalText: "IKUTI NAGA (" + streak + "x)"
+      level: currentMartingaleLevel,
+      signalText: "L" + currentMartingaleLevel + " • IKUTI NAGA (" + streak + "x)"
     };
   }
 
-  // 2. ENGINE PING-PONG FLEKSIBEL (Selang-Seling Aktif >= 3)
-  // Hitung berapa kali pergantian selang-seling terjadi di deret terdepan
-  let altCount = 1;
-  for(let i = 1; i < cats.length; i++){
-    if(cats[i] !== cats[i-1]) altCount++;
+  // 2. ENGINE PING-PONG DINAMIS (Selang-Seling >= 2)
+  // Jika 2 atau 3 ronde terakhir bergantian (misal: K -> B -> K)
+  let altSteps = 1;
+  for(let i = 1; i < Math.min(cats.length, 6); i++){
+    if(cats[i] !== cats[i-1]) altSteps++;
     else break;
   }
 
-  if(altCount >= 3){
+  if(altSteps >= 2){
+    // Pasar sedang selang-seling! Lanjutkan ayunan kebalikan
     const nextAlt = cats[0] === "Besar" ? "Kecil" : "Besar";
     return {
       tebakan: nextAlt,
-      pola: "⚡ Ping-Pong (" + altCount + "x)",
-      confidence: Math.min(76 + altCount * 3, 90),
-      signal: "STRONG",
-      signalText: "IKUTI PING-PONG (" + altCount + "x)"
+      pola: "⚡ Ping-Pong (" + altSteps + "x)",
+      level: currentMartingaleLevel,
+      signalText: "L" + currentMartingaleLevel + " • PING-PONG (" + altSteps + "x)"
     };
   }
 
-  // 3. ENSEMBLE KONSENSUS MULTI-INDIKATOR (Untuk Pasar Transisi / Non-Naga)
-  let scoreBesar = 0;
-  let scoreKecil = 0;
-
-  // Indikator A: Weighted Moving Average (WMA 4 Angka Terakhir)
-  const w = [4, 3, 2, 1];
-  let wSum = 0, wTotal = 0;
-  for(let i = 0; i < Math.min(nums.length, 4); i++){
-    wSum += nums[i] * w[i];
-    wTotal += w[i];
-  }
-  const wma = wSum / wTotal;
-  if(wma >= 5.5) scoreBesar += 3.0;
-  else if(wma >= 4.7) scoreBesar += 1.5;
-  else if(wma <= 3.5) scoreKecil += 3.0;
-  else if(wma <= 4.3) scoreKecil += 1.5;
-
-  // Indikator B: Dominansi Rolling 7 Periode
-  const slice7 = cats.slice(0, 7);
-  const b7 = slice7.filter(c => c === "Besar").length;
-  const k7 = slice7.length - b7;
-  if(b7 >= 5) scoreBesar += 2.5;
-  else if(k7 >= 5) scoreKecil += 2.5;
-  else if(b7 > k7) scoreBesar += 1.0;
-  else if(k7 > b7) scoreKecil += 1.0;
-
-  // Indikator C: Gravitasi Nilai Ekstrem
-  // Jika angka terakhir 9 (maksimum), tekanan koreksi ke bawah tinggi
-  // Jika angka terakhir 0 (minimum), tekanan koreksi ke atas tinggi
-  if(nums[0] === 9) scoreKecil += 1.5;
-  else if(nums[0] === 0) scoreBesar += 1.5;
-  else if(nums[0] >= 7) scoreBesar += 0.8;
-  else if(nums[0] <= 2) scoreKecil += 0.8;
-
-  // Indikator D: Dinamika Pasangan Kembar 2x
-  if(streak === 2){
-    // Pada pair 2x, sering terjadi pembalikan (cut) kecuali didukung WMA kuat
-    if(cats[0] === "Besar" && wma < 5.0) scoreKecil += 1.8;
-    else if(cats[0] === "Kecil" && wma > 4.0) scoreBesar += 1.8;
-    else {
-      if(cats[0] === "Besar") scoreBesar += 1.2;
-      else scoreKecil += 1.2;
-    }
-  }
-
-  // HITUNG KONSENSUS
-  const totalScore = scoreBesar + scoreKecil;
-  const isBesar = scoreBesar >= scoreKecil;
-  const winningScore = Math.max(scoreBesar, scoreKecil);
-  const ratio = totalScore > 0 ? winningScore / totalScore : 0.5;
-  const conf = Math.min(Math.round(52 + ratio * 36), 88);
-
-  // Filter Keamanan Pasar Acak (Anti-Whipsaw)
-  let signal = "NORMAL";
-  let signalText = "NORMAL (" + (isBesar ? "BESAR" : "KECIL") + ")";
-  let pola = "Konsensus " + (isBesar ? "Besar" : "Kecil");
-
-  if(conf >= 74){
-    signal = "STRONG";
-    signalText = "🔥 SINYAL KUAT (" + (isBesar ? "BESAR" : "KECIL") + ")";
-    pola = "Tren Dominan " + (isBesar ? "Besar" : "Kecil");
-  } else if(conf < 63){
-    signal = "WAIT";
-    signalText = "⚠️ SARAN: SKIP / WAIT";
-    pola = "Pasar Acak (50/50)";
-  }
-
+  // 3. DEFAULT: IKUTI PEMENANG TERAKHIR (Follow the Winner)
   return {
-    tebakan: isBesar ? "Besar" : "Kecil",
-    pola: pola,
-    confidence: conf,
-    signal: signal,
-    signalText: signalText
+    tebakan: cats[0],
+    pola: "Ikuti Arus (" + cats[0] + ")",
+    level: currentMartingaleLevel,
+    signalText: "L" + currentMartingaleLevel + " • IKUTI TREN"
   };
 }
 
@@ -417,14 +353,16 @@ function updateStatBar(){
   // Analisis Prediksi
   const pred = analisisPrediksi();
   document.getElementById("sPola").innerText = pred.pola;
-  document.getElementById("sConf").innerText = pred.confidence + "%";
 
-  const signalCard = document.getElementById("sSignalCard");
-  signalCard.querySelector(".value").innerText = pred.signalText;
-  signalCard.className = "stat-card signal " + pred.signal.toLowerCase();
+  // Level Card
+  const lvlCard = document.getElementById("sLevelCard");
+  const lvlText = pred.level === 1 ? "L1 (Normal)" : (pred.level === 2 ? "L2 (Kompensasi 3x)" : "L3 (Kompensasi 8x)");
+  document.getElementById("sLevel").innerText = lvlText;
+  lvlCard.className = "stat-card level-card lvl-" + pred.level;
 
+  // Saran Card
   const suggestCard = document.getElementById("sSuggestCard");
-  document.getElementById("sSuggest").innerText = pred.tebakan;
+  document.getElementById("sSuggest").innerText = pred.tebakan + " [L" + pred.level + "]";
   suggestCard.className = "stat-card suggest " + pred.tebakan.toLowerCase();
 }
 
@@ -489,17 +427,15 @@ function tambahBaris(periode){
 
   const pred = analisisPrediksi();
   const predClass = pred.tebakan === "Besar" ? "pred-besar" : "pred-kecil";
-  const confClass = pred.confidence >= 75 ? "high" : (pred.confidence >= 65 ? "med" : "low");
-
   const tr = document.createElement("tr");
   tr.dataset.periode = p;
   tr.dataset.done = "0";
   tr.dataset.prediksi = pred.tebakan;
-  tr.dataset.confidence = pred.confidence;
+  tr.dataset.level = pred.level;
   tr.innerHTML = `
     <td>${p}</td>
     <td class="${predClass}">${pred.tebakan}</td>
-    <td><span class="badge-conf ${confClass}">${pred.confidence}%</span></td>
+    <td><span class="badge-level lvl-${pred.level}">L${pred.level}</span></td>
     <td class="count">-</td>
     <td class="hasil">-</td>
     <td class="status">-</td>
@@ -517,15 +453,14 @@ function perbaruiPrediksiAktif(){
   if(!currentRow || currentRow.dataset.done === "1") return;
   const pred = analisisPrediksi();
   const predCell = currentRow.children[1];
-  const confCell = currentRow.children[2];
+  const levelCell = currentRow.children[2];
 
   predCell.innerText = pred.tebakan;
   predCell.className = pred.tebakan === "Besar" ? "pred-besar" : "pred-kecil";
   currentRow.dataset.prediksi = pred.tebakan;
-  currentRow.dataset.confidence = pred.confidence;
+  currentRow.dataset.level = pred.level;
 
-  const confClass = pred.confidence >= 75 ? "high" : (pred.confidence >= 65 ? "med" : "low");
-  confCell.innerHTML = `<span class="badge-conf ${confClass}">${pred.confidence}%</span>`;
+  levelCell.innerHTML = `<span class="badge-level lvl-${pred.level}">L${pred.level}</span>`;
 
   updateStatBar();
 }
@@ -542,10 +477,13 @@ function isiHasil(tr, hasil){
     statusCell.innerText = "WIN";
     statusCell.className = "status win";
     totalWin++;
+    currentMartingaleLevel = 1; // RESET KE L1 SAAT WIN
   } else {
     statusCell.innerText = "LOSE";
     statusCell.className = "status lose";
     totalLose++;
+    // Kompensasi Martingale: L1 -> L2 -> L3 -> L1
+    currentMartingaleLevel = currentMartingaleLevel >= 3 ? 1 : currentMartingaleLevel + 1;
   }
 
   const issue = tr.dataset.periode;
