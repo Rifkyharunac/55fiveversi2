@@ -268,7 +268,7 @@ function kategori(num){
   return num <= 4 ? "Kecil" : "Besar";
 }
 
-// ======== ENGINE ADAPTIVE ROAD (PREDIKSI AKURAT TREN & PING-PONG) ========
+// ======== ENGINE ADAPTIVE ROAD (PREDIKSI AKURAT TREN, PASANGAN & PING-PONG) ========
 function analisisPrediksi(){
   if(hasilHistory.length < 2){
     return {
@@ -282,8 +282,8 @@ function analisisPrediksi(){
   const cats = hasilHistory.map(h => h.kategori);
 
   // 1. ENGINE NAGA & KEMBAR (Streak >= 2)
-  // Di 55five, 67% hasil mengulang sisi sebelumnya (BB / KK / BBB / KKK).
-  // Pantang melawan tren kembar/naga!
+  // Ketika sisi yang sama sudah keluar >= 2 kali beruntun (BB / KK / BBB / KKK)
+  // Pantang melawan arus naga! Ikuti sampai putus.
   let streak = 1;
   for(let i = 1; i < cats.length; i++){
     if(cats[i] === cats[0]) streak++;
@@ -292,23 +292,23 @@ function analisisPrediksi(){
 
   if(streak >= 2){
     return {
-      tebakan: cats[0], // Lanjutkan tren kembar/naga!
+      tebakan: cats[0], // Ikuti naga / kembar!
       pola: "🔥 Naga " + cats[0] + " (" + streak + "x)",
       level: currentMartingaleLevel,
       signalText: "L" + currentMartingaleLevel + " • IKUTI NAGA (" + streak + "x)"
     };
   }
 
-  // 2. ENGINE PING-PONG DINAMIS (Selang-Seling >= 2)
-  // Jika 2 atau 3 ronde terakhir bergantian (misal: K -> B -> K)
+  // 2. ENGINE PING-PONG NYATA (Selang-Seling Terkonfirmasi >= 3 Elemen)
+  // Harus minimal 3 elemen bergantian: K-B-K atau B-K-B
   let altSteps = 1;
-  for(let i = 1; i < Math.min(cats.length, 6); i++){
+  for(let i = 1; i < Math.min(cats.length, 7); i++){
     if(cats[i] !== cats[i-1]) altSteps++;
     else break;
   }
 
-  if(altSteps >= 2){
-    // Pasar sedang selang-seling! Lanjutkan ayunan kebalikan
+  if(altSteps >= 3){
+    // Terkonfirmasi ping-pong aktif! Lanjutkan ayunan kebalikan
     const nextAlt = cats[0] === "Besar" ? "Kecil" : "Besar";
     return {
       tebakan: nextAlt,
@@ -318,12 +318,15 @@ function analisisPrediksi(){
     };
   }
 
-  // 3. DEFAULT: IKUTI PEMENANG TERAKHIR (Follow the Winner)
+  // 3. ENGINE PEMBENTUKAN PASANGAN (Switch Baru 1x)
+  // Sisi baru saja berganti (misal BBB -> K).
+  // Di 55five, sisi baru membentuk pasangan kembar (KK) sebesar >62%!
+  // Ikuti sisi baru untuk membentuk pasangan 2x!
   return {
     tebakan: cats[0],
-    pola: "Ikuti Arus (" + cats[0] + ")",
+    pola: "👥 Pasangan Baru (" + cats[0] + ")",
     level: currentMartingaleLevel,
-    signalText: "L" + currentMartingaleLevel + " • IKUTI TREN"
+    signalText: "L" + currentMartingaleLevel + " • IKUTI PASANGAN"
   };
 }
 
