@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>WEB 55 PANEL</title>
 
 <style>
@@ -11,22 +11,21 @@ body{
   margin:0;
   background:#0b0c10;
   color:#e0e6ed;
-  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   height:100vh;
   display:flex;
   flex-direction:column;
   overflow:hidden;
 }
 
-/* ======== STAT BAR ======== */
+/* ======== STAT BAR (RESPONSIVE GRID) ======== */
 .stat-bar{
-  display:flex;
-  gap:6px;
-  padding:6px 8px;
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:4px;
+  padding:5px 6px;
   background:#12141c;
   border-bottom:1px solid #1f2433;
-  flex-wrap:wrap;
-  align-items:center;
   flex-shrink:0;
 }
 
@@ -34,29 +33,45 @@ body{
   background:#1a1d29;
   border:1px solid #282f42;
   border-radius:6px;
-  padding:3px 8px;
+  padding:4px 6px;
   display:flex;
+  flex-direction:column;
+  justify-content:center;
   align-items:center;
-  gap:5px;
-  font-size:11px;
-  white-space:nowrap;
+  text-align:center;
 }
 
-.stat-card .label{ color:#8a94a6; font-size:10px; }
-.stat-card .value{ font-weight:bold; font-size:12px; }
+.stat-card .label{
+  color:#8a94a6;
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:0.3px;
+  margin-bottom:1px;
+}
+
+.stat-card .value{
+  font-weight:bold;
+  font-size:12px;
+}
+
 .stat-card.win-rate .value { color:#00e676; }
 .stat-card.streak-win .value { color:#ffeb3b; }
 .stat-card.streak-lose .value { color:#ff5252; }
 .stat-card.total .value { color:#80d8ff; }
-.stat-card.pola .value { color:#ce93d8; }
+.stat-card.pola .value { color:#ce93d8; font-size:11px; }
 .stat-card.conf .value { color:#ffd54f; }
 
-.stat-card.signal { font-weight:bold; font-size:11px; }
+.stat-card.signal {
+  grid-column: span 2;
+  font-weight:bold;
+}
 .stat-card.signal.strong { border-color:#00e676; background:#0b2918; color:#00e676; }
 .stat-card.signal.medium { border-color:#ffb300; background:#291e05; color:#ffb300; }
 .stat-card.signal.wait { border-color:#ff5252; background:#290d0d; color:#ff8a80; }
 
-.stat-card.suggest .value { font-size:12px; }
+.stat-card.suggest {
+  grid-column: span 2;
+}
 .stat-card.suggest.besar { border-color:#2979ff; background:#0d1f42; color:#82b1ff; }
 .stat-card.suggest.kecil { border-color:#ff1744; background:#380e15; color:#ff8a80; }
 
@@ -76,36 +91,42 @@ body{
 .trend-bar .tlabel{
   font-size:10px;
   color:#5a6578;
-  margin-right:3px;
+  margin-right:2px;
   flex-shrink:0;
-  font-weight:600;
+  font-weight:700;
 }
 
 .dot{
-  width:13px;
-  height:13px;
+  width:12px;
+  height:12px;
   border-radius:50%;
   flex-shrink:0;
-  cursor:help;
-  transition:transform 0.15s;
 }
-.dot:hover { transform:scale(1.3); }
-.dot.besar{ background:#2979ff; box-shadow:0 0 5px rgba(41,121,255,0.7); }
-.dot.kecil{ background:#ff1744; box-shadow:0 0 5px rgba(255,23,68,0.7); }
-.dot.pending{ background:#2e3547; }
+.dot.besar{ background:#2979ff; box-shadow:0 0 4px rgba(41,121,255,0.7); }
+.dot.kecil{ background:#ff1744; box-shadow:0 0 4px rgba(255,23,68,0.7); }
+.dot.pending{ background:#2e3547; animation:pulse 1.2s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
 
 /* ======== PANEL TABEL ======== */
 .panel{
   flex:0 0 auto;
-  max-height:28vh;
+  height:28vh;
+  min-height:160px;
+  max-height:35vh;
   background:#12141c;
   overflow-y:auto;
-  padding:0 6px 4px;
+  padding:0;
+  -webkit-overflow-scrolling:touch;
 }
 
 .web55{
   flex:1 1 auto;
   min-height:0;
+  height:100%;
 }
 
 iframe{
@@ -117,22 +138,23 @@ iframe{
 table{
   width:100%;
   border-collapse:collapse;
-  font-size:12px;
+  font-size:11px;
 }
 
 th,td{
   border:1px solid #1f2433;
-  padding:4px 6px;
+  padding:4px 3px;
   text-align:center;
 }
 
 th{
   background:#171a24;
   color:#8a94a6;
-  font-size:11px;
+  font-size:10px;
   position:sticky;
   top:0;
   z-index:2;
+  letter-spacing:0.3px;
 }
 
 tr:hover td { background:#181c28; }
@@ -143,14 +165,20 @@ td.pred-besar { color:#82b1ff; font-weight:bold; }
 td.pred-kecil { color:#ff8a80; font-weight:bold; }
 
 .badge-conf{
-  font-size:10px;
-  padding:1px 5px;
-  border-radius:4px;
+  font-size:9px;
+  padding:1px 4px;
+  border-radius:3px;
   background:#1e2433;
 }
 .badge-conf.high{ color:#00e676; }
 .badge-conf.med{ color:#ffb300; }
 .badge-conf.low{ color:#8a94a6; }
+
+.loading-cell{
+  padding:16px;
+  color:#8a94a6;
+  font-size:12px;
+}
 </style>
 </head>
 
@@ -170,20 +198,21 @@ td.pred-kecil { color:#ff8a80; font-weight:bold; }
     <span class="label">🔥 Streak</span>
     <span class="value" id="sStreak">-</span>
   </div>
-  <div class="stat-card pola">
-    <span class="label">📈 Pola</span>
-    <span class="value" id="sPola">-</span>
-  </div>
   <div class="stat-card conf">
     <span class="label">🎯 Conf</span>
     <span class="value" id="sConf">-</span>
+  </div>
+
+  <div class="stat-card pola" style="grid-column:span 2;">
+    <span class="label">📈 Pola Tren</span>
+    <span class="value" id="sPola">Menganalisis...</span>
   </div>
   <div class="stat-card signal strong" id="sSignalCard">
     <span class="label">⚡ Sinyal</span>
     <span class="value" id="sSignal">-</span>
   </div>
-  <div class="stat-card suggest" id="sSuggestCard">
-    <span class="label">🤖 Saran</span>
+  <div class="stat-card suggest" id="sSuggestCard" style="grid-column:span 2;">
+    <span class="label">🤖 Saran Prediksi</span>
     <span class="value" id="sSuggest">-</span>
   </div>
 </div>
@@ -198,15 +227,19 @@ td.pred-kecil { color:#ff8a80; font-weight:bold; }
   <table>
     <thead>
       <tr>
-        <th>Periode</th>
-        <th>Prediksi</th>
-        <th>Conf</th>
-        <th>Sisa</th>
-        <th>Hasil</th>
-        <th>Status</th>
+        <th style="width:20%;">Periode</th>
+        <th style="width:18%;">Prediksi</th>
+        <th style="width:14%;">Conf</th>
+        <th style="width:12%;">Sisa</th>
+        <th style="width:22%;">Hasil</th>
+        <th style="width:14%;">Status</th>
       </tr>
     </thead>
-    <tbody id="dataBody"></tbody>
+    <tbody id="dataBody">
+      <tr id="loadingRow">
+        <td colspan="6" class="loading-cell">⏳ Menghubungkan ke live data 55five...</td>
+      </tr>
+    </tbody>
   </table>
 </div>
 
@@ -218,10 +251,10 @@ td.pred-kecil { color:#ff8a80; font-weight:bold; }
 
 let currentRow = null;
 let timer = null;
-let lastPeriode = null;   // periode berjalan (angka, mis. 51792)
+let lastPeriode = null;
 let lastSisa = null;
 
-// history hasil resmi: [{ issue: "52864", kategori: "Besar", angka: 9 }] (terbaru di indeks 0)
+// Riwayat resmi: [{ issue: "52864", kategori: "Besar", angka: 9 }]
 let hasilHistory = [];
 let totalWin = 0;
 let totalLose = 0;
@@ -235,7 +268,7 @@ function analisisPrediksi(){
   if(hasilHistory.length < 2){
     return {
       tebakan: "Besar",
-      pola: "Inisialisasi",
+      pola: "Memuat Data...",
       confidence: 50,
       signal: "WAIT",
       signalText: "ANALISIS..."
@@ -244,8 +277,8 @@ function analisisPrediksi(){
 
   const cats = hasilHistory.map(h => h.kategori);
 
-  // 1. ENGINE NAGA (Trend Following / Dragon Streak)
-  // Aturan Emas: JANGAN PERNAH MEMOTONG NAGA! Ikuti arus naga sampai putus.
+  // 1. ENGINE NAGA (Trend Following)
+  // Pantang potong naga: Ikuti arus naga sampai putus!
   let streak = 1;
   for(let i = 1; i < cats.length; i++){
     if(cats[i] === cats[0]) streak++;
@@ -254,7 +287,7 @@ function analisisPrediksi(){
 
   if(streak >= 2){
     return {
-      tebakan: cats[0], // Ikuti naga!
+      tebakan: cats[0],
       pola: "Naga " + cats[0] + " x" + streak,
       confidence: Math.min(70 + streak * 5, 92),
       signal: "STRONG",
@@ -262,17 +295,17 @@ function analisisPrediksi(){
     };
   }
 
-  // 2. ENGINE PING-PONG (Alternating B-K-B-K)
+  // 2. ENGINE PING-PONG (Selang-Seling B-K-B-K)
   let isAlt = true;
-  const altCheckLen = Math.min(cats.length, 5);
-  for(let i = 1; i < altCheckLen; i++){
+  const altLen = Math.min(cats.length, 5);
+  for(let i = 1; i < altLen; i++){
     if(cats[i] === cats[i-1]){
       isAlt = false;
       break;
     }
   }
 
-  if(isAlt && altCheckLen >= 3){
+  if(isAlt && altLen >= 3){
     const nextAlt = cats[0] === "Besar" ? "Kecil" : "Besar";
     return {
       tebakan: nextAlt,
@@ -283,9 +316,9 @@ function analisisPrediksi(){
     };
   }
 
-  // 3. ENGINE DOBEL 2-2 / MIRROR (BB-KK / B-BB / K-KK)
+  // 3. ENGINE DOBEL 2-2 / MIRROR
   if(cats.length >= 4){
-    // Kasus 3A: [B, K, K] -> K sudah dobel, B baru single -> Prediksi lengkapi dobel B
+    // Kasus 3A: [B, K, K] -> K sudah dobel, B baru single -> lengkapi pasangan B
     if(cats[0] !== cats[1] && cats[1] === cats[2]){
       return {
         tebakan: cats[0],
@@ -296,7 +329,7 @@ function analisisPrediksi(){
       };
     }
 
-    // Kasus 3B: [B, B, K, K] -> B sudah dobel, sebelumnya K juga dobel -> Ganti pasangan ke K
+    // Kasus 3B: [B, B, K, K] -> B sudah dobel, sebelumnya K dobel -> ganti ke K
     if(cats[0] === cats[1] && cats[2] === cats[3] && cats[0] !== cats[2]){
       const nextPair = cats[0] === "Besar" ? "Kecil" : "Besar";
       return {
@@ -309,13 +342,12 @@ function analisisPrediksi(){
     }
   }
 
-  // 4. ENGINE MARKOV TRANSITION PROBABILITY (Bobot Transisi Empiris 20 Ronde Terakhir)
+  // 4. ENGINE MARKOV TRANSITION PROBABILITY (20 Ronde)
   let toBesar = 0;
   let toKecil = 0;
   const recent = cats.slice(0, 20);
 
   for(let i = 0; i < recent.length - 1; i++){
-    // recent[i] terjadi SETELAH recent[i+1]
     if(recent[i+1] === cats[0]){
       if(recent[i] === "Besar") toBesar++;
       else toKecil++;
@@ -335,7 +367,7 @@ function analisisPrediksi(){
     };
   }
 
-  // 5. DEFAULT MOMENTUM (Jika pasar acak)
+  // 5. DEFAULT MOMENTUM
   return {
     tebakan: cats[0],
     pola: "Pasar Acak (Momentum)",
@@ -352,7 +384,7 @@ function updateStatBar(){
   document.getElementById("sWinRate").innerText = wr;
   document.getElementById("sTotal").innerText = totalWin + "W/" + totalLose + "L";
 
-  // Streak dari tabel DOM
+  // Streak dari DOM
   const streakCard = document.getElementById("sStreakCard");
   const streakEl = document.getElementById("sStreak");
   const doneRows = Array.from(document.querySelectorAll("#dataBody tr[data-done='1']"));
@@ -368,7 +400,7 @@ function updateStatBar(){
     streakCard.className = "stat-card " + (cur === "WIN" ? "streak-win" : "streak-lose");
   }
 
-  // Analisis Prediksi Terkini
+  // Analisis Prediksi
   const pred = analisisPrediksi();
   document.getElementById("sPola").innerText = pred.pola;
   document.getElementById("sConf").innerText = pred.confidence + "%";
@@ -387,7 +419,6 @@ function updateTrendDots(){
   const bar = document.getElementById("trendBar");
   bar.querySelectorAll(".dot").forEach(d => d.remove());
 
-  // Tampilkan 20 titik dari hasil resmi (kiri=lama, kanan=baru)
   const slice = hasilHistory.slice(0, 20).reverse();
   slice.forEach(h => {
     const dot = document.createElement("div");
@@ -396,11 +427,10 @@ function updateTrendDots(){
     bar.appendChild(dot);
   });
 
-  // Jika ada ronde aktif berjalan, tambahkan pending dot di paling kanan
   if(currentRow && currentRow.dataset.done === "0"){
     const dot = document.createElement("div");
     dot.className = "dot pending";
-    dot.title = currentRow.dataset.periode + ": Berjalan...";
+    dot.title = currentRow.dataset.periode + ": Sedang berjalan...";
     bar.appendChild(dot);
   }
 }
@@ -408,6 +438,7 @@ function updateTrendDots(){
 async function ambilAPI(){
   try{
     const res = await fetch("/api?t=" + Date.now());
+    if(!res.ok) return null;
     return await res.json();
   }catch(e){
     console.log("API ERROR:", e);
@@ -415,7 +446,7 @@ async function ambilAPI(){
   }
 }
 
-// Sinkronisasi riwayat resmi dari API ke hasilHistory
+// Sinkronisasi riwayat resmi
 function sinkronkanHistory(list){
   if(!Array.isArray(list) || list.length === 0) return;
   list.forEach(e => {
@@ -427,7 +458,6 @@ function sinkronkanHistory(list){
       hasilHistory.push({ issue, kategori: kat, angka: num });
     }
   });
-  // Urutkan terbesar (terbaru) di indeks 0
   hasilHistory.sort((a, b) => parseInt(b.issue, 10) - parseInt(a.issue, 10));
   if(hasilHistory.length > 50) hasilHistory = hasilHistory.slice(0, 50);
 }
@@ -436,7 +466,12 @@ function sinkronkanHistory(list){
 function tambahBaris(periode){
   const tbody = document.getElementById("dataBody");
   const p = String(periode);
-  if(tbody.firstChild && tbody.firstChild.dataset.periode === p) return;
+
+  // Hapus baris loading jika ada
+  const loading = document.getElementById("loadingRow");
+  if(loading) loading.remove();
+
+  if(tbody.firstChild && tbody.firstChild.dataset && tbody.firstChild.dataset.periode === p) return;
 
   const pred = analisisPrediksi();
   const predClass = pred.tebakan === "Besar" ? "pred-besar" : "pred-kecil";
@@ -463,9 +498,7 @@ function tambahBaris(periode){
   updateStatBar();
 }
 
-// RE-EVALUATE PREDIKSI PADA BARIS AKTIF
-// Kunci penghilang lag: Begitu hasil N-1 tiba resmi dari API di detik ~25,
-// hitung ulang prediksi untuk ronde N agar 100% menggunakan data paling segar!
+// Re-evaluasi saat hasil N-1 keluar resmi dari API
 function perbaruiPrediksiAktif(){
   if(!currentRow || currentRow.dataset.done === "1") return;
   const pred = analisisPrediksi();
@@ -508,8 +541,6 @@ function isiHasil(tr, hasil){
 
   updateStatBar();
   updateTrendDots();
-
-  // Begitu baris ini selesai (misal N-1), langsung re-evaluate baris berikutnya (N) jika ada
   perbaruiPrediksiAktif();
 }
 
@@ -524,7 +555,6 @@ function cocokkanHasil(list){
     if(found) isiHasil(tr, found.hasil);
   });
 
-  // Pastikan baris aktif selalu sinkron dengan data riwayat terbaru
   perbaruiPrediksiAktif();
 }
 
@@ -533,24 +563,24 @@ async function cekData(){
   if(!data || data.error) return;
   cocokkanHasil(data.list);
 
-  // Sinkronisasi periode dari API
   const apiP = parseInt(data.periode, 10);
-  if(!isNaN(apiP) && lastPeriode !== null && apiP > lastPeriode){
-    lastPeriode = apiP;
-    tambahBaris(apiP);
+  if(!isNaN(apiP)){
+    // Perbaikan deadlock: Jika lastPeriode null atau lebih baru, langsung buat baris!
+    if(lastPeriode === null || apiP > lastPeriode){
+      lastPeriode = apiP;
+      tambahBaris(apiP);
+    }
   }
 }
 
 function mulaiCountdown(){
-  clearInterval(timer);
+  if(timer) clearInterval(timer);
   timer = setInterval(() => {
     const now = new Date();
     const sec = now.getSeconds();
-
-    // countdown sinkron 30 detik
     const sisa = 30 - (sec % 30);
 
-    // Deteksi pergantian periode
+    // Pergantian periode sinkron 30 detik
     if(lastSisa !== null && lastSisa <= 3 && sisa === 30 && lastPeriode !== null){
       lastPeriode++;
       tambahBaris(lastPeriode);
@@ -561,29 +591,19 @@ function mulaiCountdown(){
       currentRow.querySelector(".count").innerText = sisa;
     }
 
-    // Ambil update hasil setiap 2 detik
     if(sec % 2 === 0) cekData();
   }, 1000);
 }
 
+// Inisialisasi mandiri (Tidak akan membeku jika API delay)
 async function start(){
-  const data = await ambilAPI();
-  if(!data || data.error) return;
+  // 1. Selalu jalankan countdown timer terlebih dahulu
+  mulaiCountdown();
 
-  // 1. Muat 25 riwayat resmi dari API terlebih dahulu
-  if(data.list && data.list.length > 0){
-    sinkronkanHistory(data.list);
-  }
-
-  // 2. Mulai baris periode sekarang
-  lastPeriode = parseInt(data.periode, 10);
-  tambahBaris(lastPeriode);
-  cocokkanHasil(data.list);
-
-  // 3. Update dashboard & mulai timer
+  // 2. Ambil data API perdana
+  await cekData();
   updateStatBar();
   updateTrendDots();
-  mulaiCountdown();
 }
 
 start();
