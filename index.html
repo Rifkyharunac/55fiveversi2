@@ -163,6 +163,7 @@ tr:hover td { background:#181c28; }
 .lose{ color:#ff5252; font-weight:bold; }
 td.pred-besar { color:#82b1ff; font-weight:bold; }
 td.pred-kecil { color:#ff8a80; font-weight:bold; }
+td.pred-tunggu { color:#ffb300; font-weight:bold; font-size:10px; letter-spacing:0.3px; }
 
 .badge-level{
   font-size:10px;
@@ -265,27 +266,51 @@ let totalLose = 0;
 let currentMartingaleLevel = 1;
 // Prediksi terakhir yang dipasang (untuk Same-Side Martingale)
 let lastPrediksi = null;
+// Circuit Breaker: hitung lose streak & cooldown
+let loseStreakCount = 0;
+let waitRonde = 0; // jumlah ronde yang harus di-skip
 
 function kategori(num){
   return num <= 4 ? "Kecil" : "Besar";
 }
 
-// ======== ENGINE ADAPTIVE ROAD v2 (REGIME DETECTION + SAME-SIDE MARTINGALE) ========
+// ======== ENGINE ADAPTIVE ROAD v3 (DOMINANCE FILTER + CIRCUIT BREAKER) ========
+
+// Deteksi dominasi satu sisi: jika >= 7 dari 10 ronde = satu sisi, ikuti sisi itu
+function deteksiDominasi(cats){
+  if(cats.length < 8) return null;
+  const w = cats.slice(0, 10);
+  const jumlahBesar = w.filter(c => c === "Besar").length;
+  const jumlahKecil = w.length - jumlahBesar;
+  if(jumlahBesar >= 7) return "Besar";
+  if(jumlahKecil >= 7) return "Kecil";
+  return null;
+}
 
 // Deteksi rezim pasar: "naga" = dominan pasangan/tren, "chop" = ping-pong dominan
 function deteksiRezim(cats){
-  if(cats.length < 6) return "naga"; // Default ikuti tren jika data kurang
-  const window10 = cats.slice(0, Math.min(cats.length, 10));
+  if(cats.length < 6) return "naga";
+  const w = cats.slice(0, Math.min(cats.length, 10));
   let switches = 0;
-  for(let i = 1; i < window10.length; i++){
-    if(window10[i] !== window10[i-1]) switches++;
+  for(let i = 1; i < w.length; i++){
+    if(w[i] !== w[i-1]) switches++;
   }
-  // Rasio pergantian: > 60% = chop market, <= 60% = naga/tren market
-  const rasio = switches / (window10.length - 1);
-  return rasio > 0.6 ? "chop" : "naga";
+  // > 55% pergantian = chop (diturunkan dari 60% agar lebih sensitif)
+  const rasio = switches / (w.length - 1);
+  return rasio > 0.55 ? "chop" : "naga";
 }
 
 function analisisPrediksi(){
+  // === CIRCUIT BREAKER: Mode TUNGGU ===
+  if(waitRonde > 0){
+    return {
+      tebakan: null, // null = skip/tunggu
+      pola: "⏸️ TUNGGU " + waitRonde + " ronde lagi (recovery)",
+      level: currentMartingaleLevel,
+      signalText: "⏸️ TUNGGU — jangan pasang"
+    };
+  }
+
   if(hasilHistory.length < 2){
     return {
       tebakan: "Besar",
@@ -296,6 +321,19 @@ function analisisPrediksi(){
   }
 
   const cats = hasilHistory.map(h => h.kategori);
+
+  // === DOMINANCE FILTER (prioritas tertinggi) ===
+  // Jika satu sisi mendominasi 7+/10 ronde terakhir, ikuti sisi itu
+  const dominasi = deteksiDominasi(cats);
+  if(dominasi){
+    return {
+      tebakan: dominasi,
+      pola: "⚠️ Dominasi " + dominasi + " — ikuti arus pasar",
+      level: currentMartingaleLevel,
+      signalText: "L" + currentMartingaleLevel + " • DOMINASI " + dominasi
+    };
+  }
+
   const rezim = deteksiRezim(cats);
 
   // === STREAK ENGINE ===
@@ -316,32 +354,28 @@ function analisisPrediksi(){
   // REZIM NAGA/TREN
   // ======================
   if(rezim === "naga"){
-
     // NAGA >= 2: Ikuti arus
     if(streak >= 2){
       return {
         tebakan: cats[0],
-        pola: "🔥 Naga " + cats[0] + " (" + streak + "x) | Rezim: Tren",
+        pola: "🔥 Naga " + cats[0] + " (" + streak + "x) | Tren",
         level: currentMartingaleLevel,
         signalText: "L" + currentMartingaleLevel + " • NAGA " + streak + "x"
       };
     }
-
-    // SAME-SIDE MARTINGALE: Jika sedang lose (L2/L3), pertahankan sisi sebelumnya
-    // karena rezim tren, sisi yang keluar lagi cenderung membentuk pasangan
+    // L2/L3: pertahankan sisi — dalam rezim tren, cenderung pasangan
     if(currentMartingaleLevel >= 2 && lastPrediksi){
       return {
         tebakan: lastPrediksi,
-        pola: "🛡️ Kompensasi " + lastPrediksi + " | Rezim: Tren",
+        pola: "🛡️ Kompensasi " + lastPrediksi + " | Tren",
         level: currentMartingaleLevel,
         signalText: "L" + currentMartingaleLevel + " • STAY " + lastPrediksi
       };
     }
-
     // Switch baru 1x: Ikuti sisi baru (pasangan)
     return {
       tebakan: cats[0],
-      pola: "👥 Pasangan Baru (" + cats[0] + ") | Rezim: Tren",
+      pola: "👥 Pasangan Baru (" + cats[0] + ") | Tren",
       level: currentMartingaleLevel,
       signalText: "L" + currentMartingaleLevel + " • IKUTI PASANGAN"
     };
@@ -351,45 +385,40 @@ function analisisPrediksi(){
   // REZIM CHOP (PING-PONG)
   // ======================
   if(rezim === "chop"){
-
     // Ping-pong terkonfirmasi >= 3: Lanjutkan ayunan
     if(altSteps >= 3){
       const nextAlt = cats[0] === "Besar" ? "Kecil" : "Besar";
       return {
         tebakan: nextAlt,
-        pola: "⚡ Ping-Pong (" + altSteps + "x) | Rezim: Chop",
+        pola: "⚡ Ping-Pong (" + altSteps + "x) | Chop",
         level: currentMartingaleLevel,
         signalText: "L" + currentMartingaleLevel + " • PING-PONG"
       };
     }
-
-    // Chop tapi ada naga >= 2: Ikuti naga (naga sementara dalam chop)
+    // Chop tapi ada naga >= 2
     if(streak >= 2){
       return {
         tebakan: cats[0],
-        pola: "🔥 Naga Sementara (" + streak + "x) | Rezim: Chop",
+        pola: "🔥 Naga Sementara (" + streak + "x) | Chop",
         level: currentMartingaleLevel,
-        signalText: "L" + currentMartingaleLevel + " • NAGA DALAM CHOP"
+        signalText: "L" + currentMartingaleLevel + " • NAGA CHOP"
       };
     }
-
-    // SAME-SIDE MARTINGALE dalam chop: Jika L2/L3 di tengah chop,
-    // ambil kebalikan karena chop market cenderung berbalik
+    // L2/L3: balik sisi (chop market berbalik)
     if(currentMartingaleLevel >= 2 && lastPrediksi){
       const kompensasi = lastPrediksi === "Besar" ? "Kecil" : "Besar";
       return {
         tebakan: kompensasi,
-        pola: "🔄 Kompensasi Chop (" + kompensasi + ") | Rezim: Chop",
+        pola: "🔄 Kompensasi Chop (" + kompensasi + ") | Chop",
         level: currentMartingaleLevel,
         signalText: "L" + currentMartingaleLevel + " • BALIK " + kompensasi
       };
     }
-
     // Default chop: Ikuti kebalikan
     const opposite = cats[0] === "Besar" ? "Kecil" : "Besar";
     return {
       tebakan: opposite,
-      pola: "↔️ Ayun Chop (" + opposite + ") | Rezim: Chop",
+      pola: "↔️ Ayun Chop (" + opposite + ") | Chop",
       level: currentMartingaleLevel,
       signalText: "L" + currentMartingaleLevel + " • AYUN"
     };
@@ -503,16 +532,20 @@ function tambahBaris(periode){
   if(tbody.firstChild && tbody.firstChild.dataset && tbody.firstChild.dataset.periode === p) return;
 
   const pred = analisisPrediksi();
-  const predClass = pred.tebakan === "Besar" ? "pred-besar" : "pred-kecil";
+  // Handle mode TUNGGU (tebakan = null)
+  const isTunggu = pred.tebakan === null;
+  const predClass = isTunggu ? "pred-tunggu" : (pred.tebakan === "Besar" ? "pred-besar" : "pred-kecil");
+  const predLabel = isTunggu ? "⏸️ TUNGGU" : pred.tebakan;
+  const levelLabel = isTunggu ? "—" : `<span class="badge-level lvl-${pred.level}">L${pred.level}</span>`;
   const tr = document.createElement("tr");
   tr.dataset.periode = p;
   tr.dataset.done = "0";
-  tr.dataset.prediksi = pred.tebakan;
+  tr.dataset.prediksi = isTunggu ? "TUNGGU" : pred.tebakan;
   tr.dataset.level = pred.level;
   tr.innerHTML = `
     <td>${p}</td>
-    <td class="${predClass}">${pred.tebakan}</td>
-    <td><span class="badge-level lvl-${pred.level}">L${pred.level}</span></td>
+    <td class="${predClass}">${predLabel}</td>
+    <td>${levelLabel}</td>
     <td class="count">-</td>
     <td class="hasil">-</td>
     <td class="status">-</td>
@@ -520,6 +553,9 @@ function tambahBaris(periode){
   tbody.insertBefore(tr, tbody.firstChild);
   while(tbody.children.length > 35) tbody.removeChild(tbody.lastChild);
   currentRow = tr;
+
+  // Kurangi waitRonde setiap kali baris baru dibuat (satu ronde berlalu)
+  if(waitRonde > 0) waitRonde--;
 
   updateTrendDots();
   updateStatBar();
@@ -531,13 +567,14 @@ function perbaruiPrediksiAktif(){
   const pred = analisisPrediksi();
   const predCell = currentRow.children[1];
   const levelCell = currentRow.children[2];
+  const isTunggu = pred.tebakan === null;
 
-  predCell.innerText = pred.tebakan;
-  predCell.className = pred.tebakan === "Besar" ? "pred-besar" : "pred-kecil";
-  currentRow.dataset.prediksi = pred.tebakan;
+  predCell.innerText = isTunggu ? "⏸️ TUNGGU" : pred.tebakan;
+  predCell.className = isTunggu ? "pred-tunggu" : (pred.tebakan === "Besar" ? "pred-besar" : "pred-kecil");
+  currentRow.dataset.prediksi = isTunggu ? "TUNGGU" : pred.tebakan;
   currentRow.dataset.level = pred.level;
 
-  levelCell.innerHTML = `<span class="badge-level lvl-${pred.level}">L${pred.level}</span>`;
+  levelCell.innerHTML = isTunggu ? "—" : `<span class="badge-level lvl-${pred.level}">L${pred.level}</span>`;
 
   updateStatBar();
 }
@@ -553,18 +590,35 @@ function isiHasil(tr, hasil){
   // Simpan prediksi terakhir untuk Same-Side Martingale
   lastPrediksi = prediksi;
 
+  if(prediksi === "TUNGGU"){
+    // Skip ronde, tidak dihitung W/L
+    statusCell.innerText = "SKIP";
+    statusCell.className = "status";
+    if(waitRonde > 0) waitRonde--;
+    return;
+  }
+
   if(prediksi === kat){
     statusCell.innerText = "WIN";
     statusCell.className = "status win";
     totalWin++;
-    currentMartingaleLevel = 1; // RESET KE L1 SAAT WIN
-    lastPrediksi = null; // Reset setelah WIN
+    currentMartingaleLevel = 1;
+    lastPrediksi = null;
+    loseStreakCount = 0; // Reset lose streak saat WIN
+    waitRonde = 0;
   } else {
     statusCell.innerText = "LOSE";
     statusCell.className = "status lose";
     totalLose++;
-    // Kompensasi Martingale: L1 -> L2 -> L3 -> L1
     currentMartingaleLevel = currentMartingaleLevel >= 3 ? 1 : currentMartingaleLevel + 1;
+    loseStreakCount++;
+    // CIRCUIT BREAKER: 3 lose berturut → tunggu 3 ronde
+    if(loseStreakCount >= 3){
+      waitRonde = 3;
+      loseStreakCount = 0;
+      lastPrediksi = null;
+      currentMartingaleLevel = 1; // Reset ke L1 saat masuk cooldown
+    }
   }
 
   const issue = tr.dataset.periode;
