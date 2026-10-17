@@ -1,4 +1,89 @@
-﻿# CHANGELOG — 55five Prediction Panel
+
+---
+
+## [v4.0] — Consensus Multi-Strategy Engine + Integrasi Basis Data riwayat.json
+**Tanggal:** 2026-10-17
+**File:** `index.html`, `data/riwayat.json`
+
+### Masalah yang Ditemukan (Screenshot Periode 50531-50533)
+- Bot mengalami **3 LOSE beruntun** saat pasar memasuki pola Ping-Pong (Besar -> Kecil -> Besar -> Kecil).
+- **Penyebab Utama 1 (Chop Kompensasi Bug):** Logika Martingale L2/L3 membalikkan sisi dari `lastPrediksi` (`kompensasi = lastPrediksi === "Besar" ? "Kecil" : "Besar"`). Karena `lastPrediksi` salah, pembalikan tersebut justru selalu berlawanan dengan ritme ayunan pasar, menjamin kekalahan di tiap level kompensasi.
+- **Penyebab Utama 2 (Pasangan Baru Trap):** Setiap terjadi perpindahan 1x, bot langsung menebak sisi baru tersebut akan berpasangan (`cats[0]`), sehingga di pasar ping-pong bot selalu kalah.
+- **Penyebab Utama 3 (Kurangnya Riwayat & Konsensus):** Bot hanya melihat 10 ronde terakhir tanpa memverifikasi probabilitas historis jangka panjang dan memaksakan tebakan 50/50.
+
+### Perubahan & Solusi
+1. **Integrasi Arsip Riwayat (`data/riwayat.json`):**
+   - Mengambil ~2.000 ronde riwayat historis asli dari repositori `Rifkyharunac/55five`.
+   - Disimpan di `data/riwayat.json` dan dimuat otomatis saat inisialisasi aplikasi.
+2. **Strategi 1 — N-gram Pattern Matching:**
+   - Memindai pola urutan 3-5 ronde terakhir terhadap ~2.000 ronde riwayat untuk mencari kembaran pola historis.
+   - Hanya memberikan suara jika rasio historis mencapai >= 60% searah (dari minimal 2 kemunculan).
+3. **Strategi 2 — Smart Wave Dynamics (Naga vs Ping-Pong):**
+   - Mendeteksi ayunan Ping-Pong terkonfirmasi (`altSteps >= 2`) dan selalu menebak kebalikan dari hasil terakhir (`cats[0] === "Besar" ? "Kecil" : "Besar"`).
+   - Mendeteksi Naga (`streak >= 2`) dan mengikuti momentum searah (`cats[0]`).
+   - Jika belum terkonfirmasi, bersikap netral (tidak menebak sembarangan).
+4. **Strategi 3 — Dominansi & Tren Mayoritas:**
+   - Menganalisis tren 25-30 ronde terakhir untuk mendeteksi kecenderungan dominan (>= 60%).
+5. **Mesin Konsensus (Voting Rule):**
+   - Minimal **2 dari 3 strategi independen** harus sepakat untuk menghasilkan sinyal taruhan.
+   - Jika sinyal saling bertentangan atau tidak ada sinyal kuat -> bot otomatis beralih ke mode **`⏸️ TUNGGU` (ABSTAIN)**, melindungi modal dari kekalahan beruntun.
+6. **Perbaikan Multiplier Martingale:**
+   - Level Martingale (L1 = 1x, L2 = 3x, L3 = 8x) sekarang murni mengatur pengali taruhan dan **TIDAK PERNAH membalikkan arah prediksi**. Arah prediksi 100% diputuskan oleh mesin konsensus.
+   - Countdown Circuit Breaker diperbaiki agar berkurang tepat 1 ronde per hasil selesai.
+
+---
+
+## [v3.2] — Tampilan Akses Situs (Sesuai Foto / Desain Panel)
+**Tanggal:** 2026-10-17
+**File:** `index.html`
+
+### Masalah
+- Tampilan iframe situs eksternal yang langsung termuat otomatis mengganggu kenyamanan dan sering memicu dialog eksternal.
+
+### Perubahan
+1. **Kartu Akses Situs Terintegrasi:**
+   - Menampilkan kartu modern sesuai foto dengan tag `AKSES SITUS`, judul `Buka 55five`, dan deskripsi.
+   - Tombol utama **"Buka situs ↗"** (hijau mint) membuka situs 55five di tab browser terpisah tanpa mengganggu panel prediksi.
+   - Tombol sekunder **"Tampilkan dalam panel"** memuat iframe langsung di dalam panel bawah sesuai kebutuhan pengguna.
+2. **Toolbar Iframe dengan Tombol Tutup:**
+   - Saat iframe aktif di dalam panel, terdapat toolbar atas dengan tombol **"✕ Tutup Panel"** untuk kembali ke mode kartu kapan saja, serta tautan cepat ke tab baru.
+3. **Efisiensi Memori:**
+   - Iframe tidak lagi di-load otomatis (`about:blank` saat awal), menghemat resource dan mencegah gangguan popup eksternal.
+
+---
+
+## [v3.1] — Dominance Filter + Circuit Breaker (STOP LOSS)
+**Tanggal:** 2026-10-17
+**File:** `index.html`
+
+### Masalah yang Ditemukan (Screenshot periode 50468-50475)
+- **6 LOSE beruntun** semua ke arah Kecil, bot terus menebak Besar.
+- Pasar sedang dalam **fase Kecil dominan** (7+/10 hasil = Kecil), tapi engine tidak mendeteksinya.
+- Tidak ada mekanisme STOP saat lose streak ekstrem.
+
+### Perubahan
+
+#### 1. Dominance Filter (prioritas tertinggi)
+- Fungsi baru `deteksiDominasi(cats)`: cek 10 ronde terakhir.
+- Jika >= 7 ronde = satu sisi (misal 7/10 Kecil) → **paksa prediksi ke sisi dominan**.
+- Override semua logic lain (Naga, Ping-Pong, Pasangan).
+
+#### 2. Circuit Breaker — Mode TUNGGU
+- State baru: `loseStreakCount` dan `waitRonde`.
+- Setelah **3 LOSE berturut**, masuk mode TUNGGU 3 ronde:
+  - Tampil label `⏸️ TUNGGU` di kolom Prediksi (warna kuning).
+  - Ronde tidak dihitung sebagai W/L.
+  - Martingale level di-reset ke L1.
+  - `waitRonde` berkurang 1 setiap ronde baru.
+- Ini mencegah "double down di tengah badai lose".
+
+#### 3. Tuning Threshold Rezim
+- Threshold chop market diturunkan dari **60% ke 55%** agar lebih cepat mendeteksi pasar choppy.
+
+#### 4. CSS Baru
+- `td.pred-tunggu`: warna kuning/oranye untuk baris mode TUNGGU, beda jelas dari Besar (biru) dan Kecil (merah).
+
+# CHANGELOG — 55five Prediction Panel
 
 > Semua perubahan yang terjadi pada proyek `55five-main` sejak sesi perbaikan dimulai.
 > Game: **WinGo 30s** — Besar (5-9) / Kecil (0-4) — Undian setiap 30 detik.
@@ -174,3 +259,4 @@ Vercel Edge
 3. **L2 & L3 = kompensasi**, bukan eskala buta. Bot menyesuaikan sisi berdasarkan rezim.
 4. **Pola Naga panjang (>= 4x)** = sinyal terkuat, win rate historis tertinggi.
 5. **Chop market** (Ping-Pong panjang) = hindari atau kurangi bet karena lebih volatile.
+
