@@ -127,13 +127,165 @@ body{
   flex:1 1 auto;
   min-height:0;
   height:100%;
+  position:relative;
+  background:#0c0f13;
+  overflow:hidden;
+}
+
+/* KARTU AKSES SITUS (Sesuai Desain Foto) */
+.site-access-wrapper{
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:#0c0f13;
+}
+
+.site-access-card{
+  background:#141c17;
+  border:1px solid #1f2e25;
+  border-radius:14px;
+  padding:26px 22px;
+  width:100%;
+  max-width:320px;
+  box-shadow:0 12px 32px rgba(0,0,0,0.45);
+  display:flex;
+  flex-direction:column;
+  box-sizing:border-box;
+}
+
+.site-access-tag{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:#6ee7b7;
+  margin-bottom:12px;
+}
+
+.site-access-title{
+  font-size:22px;
+  font-weight:700;
+  color:#ffffff;
+  margin-bottom:8px;
+  line-height:1.2;
+}
+
+.site-access-desc{
+  font-size:13px;
+  color:#8e9e94;
+  margin-bottom:22px;
+  line-height:1.45;
+}
+
+.btn-open-site{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:100%;
+  background:#9ae2b8;
+  color:#0e281d;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:600;
+  padding:12px 16px;
+  border-radius:6px;
+  border:none;
+  cursor:pointer;
+  transition:background 0.2s, transform 0.1s;
+}
+
+.btn-open-site:hover{
+  background:#b3f2cc;
+}
+
+.btn-open-site:active{
+  transform:scale(0.98);
+}
+
+.btn-toggle-panel{
+  background:transparent;
+  border:none;
+  color:#8ee0b0;
+  font-size:13px;
+  font-weight:500;
+  margin-top:16px;
+  padding:6px;
+  cursor:pointer;
+  text-align:center;
+  transition:color 0.2s;
+}
+
+.btn-toggle-panel:hover{
+  color:#cbf7de;
+  text-decoration:underline;
+}
+
+/* IFRAME WRAPPER */
+.iframe-wrapper{
+  width:100%;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
+
+.iframe-toolbar{
+  flex-shrink:0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:5px 12px;
+  background:#141722;
+  border-bottom:1px solid #1f2538;
+}
+
+.iframe-title{
+  font-size:11px;
+  color:#8a94a6;
+  font-weight:600;
+}
+
+.iframe-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.iframe-link{
+  font-size:11px;
+  color:#6ee7b7;
+  text-decoration:none;
+  font-weight:500;
+}
+
+.iframe-link:hover{
+  text-decoration:underline;
+}
+
+.btn-close-frame{
+  background:#202636;
+  border:1px solid #313a52;
+  color:#e0e6ed;
+  font-size:11px;
+  padding:2px 8px;
+  border-radius:4px;
+  cursor:pointer;
+}
+
+.btn-close-frame:hover{
+  background:#2d364c;
 }
 
 iframe{
   width:100%;
-  height:100%;
+  flex:1 1 auto;
+  min-height:0;
   border:none;
 }
+
 
 table{
   width:100%;
@@ -246,8 +398,33 @@ td.pred-tunggu { color:#ffb300; font-weight:bold; font-size:10px; letter-spacing
   </table>
 </div>
 
-<div class="web55">
-  <iframe src="https://55x4mqd.com/#/home/"></iframe>
+<div class="web55" id="web55Container">
+  <!-- KARTU AKSES SITUS (Sesuai Desain Foto) -->
+  <div class="site-access-wrapper" id="siteAccessCard">
+    <div class="site-access-card">
+      <div class="site-access-tag">AKSES SITUS</div>
+      <div class="site-access-title">Buka 55five</div>
+      <div class="site-access-desc">Akses situs eksternal dalam panel atau di tab terpisah.</div>
+      <a href="https://55x4mqd.com/#/home/" target="_blank" rel="noopener noreferrer" class="btn-open-site">
+        Buka situs ↗
+      </a>
+      <button type="button" class="btn-toggle-panel" id="btnShowPanel">
+        Tampilkan dalam panel
+      </button>
+    </div>
+  </div>
+
+  <!-- IFRAME VIEW -->
+  <div class="iframe-wrapper" id="iframeWrapper" style="display:none;">
+    <div class="iframe-toolbar">
+      <span class="iframe-title">🌐 55five Live Panel</span>
+      <div class="iframe-actions">
+        <a href="https://55x4mqd.com/#/home/" target="_blank" rel="noopener noreferrer" class="iframe-link">Buka di Tab ↗</a>
+        <button type="button" class="btn-close-frame" id="btnCloseFrame" title="Sembunyikan iframe">✕ Tutup Panel</button>
+      </div>
+    </div>
+    <iframe id="mainIframe" src="about:blank"></iframe>
+  </div>
 </div>
 
 <script>
@@ -697,6 +874,30 @@ async function start(){
 }
 
 start();
+
+// Kontrol Akses Situs 55five (Card vs Iframe)
+const siteAccessCard = document.getElementById("siteAccessCard");
+const iframeWrapper = document.getElementById("iframeWrapper");
+const mainIframe = document.getElementById("mainIframe");
+const btnShowPanel = document.getElementById("btnShowPanel");
+const btnCloseFrame = document.getElementById("btnCloseFrame");
+
+if(btnShowPanel){
+  btnShowPanel.addEventListener("click", () => {
+    if(!mainIframe.getAttribute("src") || mainIframe.getAttribute("src") === "about:blank"){
+      mainIframe.src = "https://55x4mqd.com/#/home/";
+    }
+    siteAccessCard.style.display = "none";
+    iframeWrapper.style.display = "flex";
+  });
+}
+
+if(btnCloseFrame){
+  btnCloseFrame.addEventListener("click", () => {
+    iframeWrapper.style.display = "none";
+    siteAccessCard.style.display = "flex";
+  });
+}
 
 </script>
 
