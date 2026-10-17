@@ -1,6 +1,34 @@
 
 ---
 
+## [v4.1] — Eliminasi Skip Berlebih & Perbaikan Freeze "Undian..."
+**Tanggal:** 2026-10-17
+**File:** `api/index.js`, `index.html`
+
+### Masalah yang Ditemukan (5 Screenshot Pengguna)
+1. **Terlalu Banyak SKIP (Screenshot 2 & 3):**
+   - Aturan voting konsensus v4 sebelumnya mewajibkan minimal 2 suara. Karena kondisi normal sering kali hanya memicu 1 strategi aktif, bot terjebak dalam mode `TUNGGU` hingga 5–8 ronde berturut-turut.
+2. **Kekalahan di Ujung Tren ("Selesai skip lose juga"):**
+   - Sinyal baru muncul terlambat saat tren sudah jenuh/berakhir (di atas 60%), memicu kekalahan tepat setelah jeda panjang.
+3. **Bug Freeze Baris "Undian..." (Screenshot 5):**
+   - Saat detik :00, timer lokal klien terus membuat baris periode baru (`lastPeriode++`) tanpa menunggu konfirmasi dari server.
+   - Panggilan API setiap 2 detik tanpa jeda/cache membuat serverless function Vercel atau upstream API membatasi kuota/timeout, sehingga 5 baris menumpuk tanpa pernah mendapat hasil undian.
+
+### Perubahan & Solusi
+1. **Hierarki Sinyal VIP Aktif (Menghapus Skip Berlebihan):**
+   - **Prioritas Utama (Gelombang Naga & Ping-Pong):** Jika pasar sedang Naga (`streak >= 2`) atau Ping-Pong (`altSteps >= 2`), bot **LANGSUNG memberi sinyal aktif** tanpa syarat voting ganda. Tidak ada lagi skip saat pola sedang bagus!
+   - **Prioritas Kedua (Pola Riwayat):** Jika terjadi patahan tren (1 switch), bot menggunakan N-gram dari `riwayat.json` untuk memilih arah yang memiliki rasio historis tertinggi.
+   - **Mode TUNGGU Murni Proteksi:** Mode `⏸️ TUNGGU` sekarang **HANYA AKTIF** saat Circuit Breaker menyala (setelah 3 LOSE beruntun) selama 2 ronde untuk pendinginan modal, bukan di ronde normal.
+2. **Optimasi API Backend (`api/index.js`):**
+   - Menambahkan **In-Memory Cache (TTL 2.5 detik)**: Panggilan beruntun langsung dijawab dalam 0ms tanpa membebani server upstream.
+   - Mengambil data periode & hasil secara paralel (`Promise.all`), memotong latensi hingga 50%.
+   - Perlindungan `AbortSignal.timeout(6000)` agar serverless tidak membeku.
+3. **Sinkronisasi Periode Presisi (Anti-Freeze):**
+   - Baris periode baru di tabel sekarang **100% mengikuti respon resmi dari server API (`data.periode`)**, bukan ditambah sembarangan oleh jam laptop/HP klien.
+   - Ditambahkan pembersih baris yatim (*orphan row cleaner*): jika koneksi sempat terputus, baris lama yang tertinggal otomatis ditutup/diselesaikan dan tidak akan macet di status "Undian..." selamanya.
+
+---
+
 ## [v4.0] — Consensus Multi-Strategy Engine + Integrasi Basis Data riwayat.json
 **Tanggal:** 2026-10-17
 **File:** `index.html`, `data/riwayat.json`

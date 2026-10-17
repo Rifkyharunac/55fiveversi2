@@ -1,19 +1,30 @@
-export default async function handler(req, res) {
+// Cache in-memory module scope untuk Vercel Serverless Function
+let cachedData = null;
+let lastFetchTime = 0;
+const CACHE_TTL_MS = 2500; // Cache 2.5 detik untuk cegah spam upstream & rate limit
 
-  // Allow CORS (aman walau satu domain)
+export default async function handler(req, res) {
+  // Allow CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+
+  const now = Date.now();
+
+  // Kembalikan cache jika masih dalam batas TTL (hemat latency & cegah ban IP)
+  if (cachedData && (now - lastFetchTime) < CACHE_TTL_MS) {
+    return res.status(200).json(cachedData);
+  }
 
   try {
+    const timeoutSignal = AbortSignal.timeout(6000);
 
-    // ======================
-    // GET PERIODE
-    // ======================
-    const issueResp = await fetch(
+    const issuePromise = fetch(
       "https://newapi.55lottertttapi.com/api/webapi/GetGameIssue",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: timeoutSignal,
         body: JSON.stringify({
           typeId: 30,
           language: 0,
@@ -24,25 +35,12 @@ export default async function handler(req, res) {
       }
     );
 
-    const issueJson = await issueResp.json();
-
-    if (!issueJson?.data?.issueNumber) {
-      return res.status(500).json({
-        error: "Gagal ambil periode"
-      });
-    }
-
-    const fullIssue = issueJson.data.issueNumber;
-    const periode = fullIssue.toString().slice(-5);
-
-    // ======================
-    // GET HASIL
-    // ======================
-    const resultResp = await fetch(
+    const historyPromise = fetch(
       "https://newapi.55lottertttapi.com/api/webapi/GetNoaverageEmerdList",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: timeoutSignal,
         body: JSON.stringify({
           pageSize: 10,
           pageNo: 1,
@@ -55,37 +53,53 @@ export default async function handler(req, res) {
       }
     );
 
+    // Ambil kedua endpoint secara paralel untuk performa 2x lebih cepat
+    const [issueResp, resultResp] = await Promise.all([issuePromise, historyPromise]);
+
+    const issueJson = await issueResp.json();
     const resultJson = await resultResp.json();
+
+    if (!issueJson?.data?.issueNumber) {
+      if (cachedData) return res.status(200).json(cachedData);
+      return res.status(500).json({ error: "Gagal ambil periode" });
+    }
+
+    const fullIssue = issueJson.data.issueNumber;
+    const periode = fullIssue.toString().slice(-5);
     const list = resultJson?.data?.list || [];
 
     if (!list.length) {
-      return res.status(500).json({
-        error: "List hasil kosong"
-      });
+      if (cachedData) return res.status(200).json(cachedData);
+      return res.status(500).json({ error: "List hasil kosong" });
     }
 
     const numberString = list[0].number;
-    const lastDigit = numberString.split(",").pop();
+    const lastDigit = parseInt(String(numberString).split(",").pop(), 10);
 
-    // ======================
-    // RETURN FINAL
-    // ======================
-    return res.status(200).json({
+    const payload = {
       periode,
       issue: fullIssue,
-      hasil: parseInt(lastDigit),
+      hasil: lastDigit,
       number: numberString,
-      // daftar hasil lengkap biar frontend bisa mencocokkan hasil ke periode yg tepat
-      // setiap item sudah include 'hasil' (digit terakhir) agar frontend tidak perlu re-parse
       list: list.slice(0, 10).map(e => ({
         issueNumber: e.issueNumber,
         number: e.number,
         hasil: parseInt(String(e.number).split(",").pop(), 10),
         colour: e.colour || ''
-      }))
-    });
+      })),
+      timestamp: now
+    };
+
+    cachedData = payload;
+    lastFetchTime = now;
+
+    return res.status(200).json(payload);
 
   } catch (err) {
+    // Jika upstream lambat / timeout tapi kita punya cache sebelumnya, pakai cache!
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
     return res.status(500).json({
       error: "Server error",
       detail: err.message
