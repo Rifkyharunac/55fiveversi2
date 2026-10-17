@@ -263,12 +263,28 @@ let totalLose = 0;
 
 // Sistem Level Martingale VIP (L1, L2, L3)
 let currentMartingaleLevel = 1;
+// Prediksi terakhir yang dipasang (untuk Same-Side Martingale)
+let lastPrediksi = null;
 
 function kategori(num){
   return num <= 4 ? "Kecil" : "Besar";
 }
 
-// ======== ENGINE ADAPTIVE ROAD (PREDIKSI AKURAT TREN, PASANGAN & PING-PONG) ========
+// ======== ENGINE ADAPTIVE ROAD v2 (REGIME DETECTION + SAME-SIDE MARTINGALE) ========
+
+// Deteksi rezim pasar: "naga" = dominan pasangan/tren, "chop" = ping-pong dominan
+function deteksiRezim(cats){
+  if(cats.length < 6) return "naga"; // Default ikuti tren jika data kurang
+  const window10 = cats.slice(0, Math.min(cats.length, 10));
+  let switches = 0;
+  for(let i = 1; i < window10.length; i++){
+    if(window10[i] !== window10[i-1]) switches++;
+  }
+  // Rasio pergantian: > 60% = chop market, <= 60% = naga/tren market
+  const rasio = switches / (window10.length - 1);
+  return rasio > 0.6 ? "chop" : "naga";
+}
+
 function analisisPrediksi(){
   if(hasilHistory.length < 2){
     return {
@@ -280,48 +296,106 @@ function analisisPrediksi(){
   }
 
   const cats = hasilHistory.map(h => h.kategori);
+  const rezim = deteksiRezim(cats);
 
-  // 1. ENGINE NAGA & KEMBAR (Streak >= 2)
-  // Ketika sisi yang sama sudah keluar >= 2 kali beruntun (BB / KK / BBB / KKK)
-  // Pantang melawan arus naga! Ikuti sampai putus.
+  // === STREAK ENGINE ===
   let streak = 1;
   for(let i = 1; i < cats.length; i++){
     if(cats[i] === cats[0]) streak++;
     else break;
   }
 
-  if(streak >= 2){
-    return {
-      tebakan: cats[0], // Ikuti naga / kembar!
-      pola: "🔥 Naga " + cats[0] + " (" + streak + "x)",
-      level: currentMartingaleLevel,
-      signalText: "L" + currentMartingaleLevel + " • IKUTI NAGA (" + streak + "x)"
-    };
-  }
-
-  // 2. ENGINE PING-PONG NYATA (Selang-Seling Terkonfirmasi >= 3 Elemen)
-  // Harus minimal 3 elemen bergantian: K-B-K atau B-K-B
+  // === PING-PONG ENGINE ===
   let altSteps = 1;
-  for(let i = 1; i < Math.min(cats.length, 7); i++){
+  for(let i = 1; i < Math.min(cats.length, 8); i++){
     if(cats[i] !== cats[i-1]) altSteps++;
     else break;
   }
 
-  if(altSteps >= 3){
-    // Terkonfirmasi ping-pong aktif! Lanjutkan ayunan kebalikan
-    const nextAlt = cats[0] === "Besar" ? "Kecil" : "Besar";
+  // ======================
+  // REZIM NAGA/TREN
+  // ======================
+  if(rezim === "naga"){
+
+    // NAGA >= 2: Ikuti arus
+    if(streak >= 2){
+      return {
+        tebakan: cats[0],
+        pola: "🔥 Naga " + cats[0] + " (" + streak + "x) | Rezim: Tren",
+        level: currentMartingaleLevel,
+        signalText: "L" + currentMartingaleLevel + " • NAGA " + streak + "x"
+      };
+    }
+
+    // SAME-SIDE MARTINGALE: Jika sedang lose (L2/L3), pertahankan sisi sebelumnya
+    // karena rezim tren, sisi yang keluar lagi cenderung membentuk pasangan
+    if(currentMartingaleLevel >= 2 && lastPrediksi){
+      return {
+        tebakan: lastPrediksi,
+        pola: "🛡️ Kompensasi " + lastPrediksi + " | Rezim: Tren",
+        level: currentMartingaleLevel,
+        signalText: "L" + currentMartingaleLevel + " • STAY " + lastPrediksi
+      };
+    }
+
+    // Switch baru 1x: Ikuti sisi baru (pasangan)
     return {
-      tebakan: nextAlt,
-      pola: "⚡ Ping-Pong (" + altSteps + "x)",
+      tebakan: cats[0],
+      pola: "👥 Pasangan Baru (" + cats[0] + ") | Rezim: Tren",
       level: currentMartingaleLevel,
-      signalText: "L" + currentMartingaleLevel + " • PING-PONG (" + altSteps + "x)"
+      signalText: "L" + currentMartingaleLevel + " • IKUTI PASANGAN"
     };
   }
 
-  // 3. ENGINE PEMBENTUKAN PASANGAN (Switch Baru 1x)
-  // Sisi baru saja berganti (misal BBB -> K).
-  // Di 55five, sisi baru membentuk pasangan kembar (KK) sebesar >62%!
-  // Ikuti sisi baru untuk membentuk pasangan 2x!
+  // ======================
+  // REZIM CHOP (PING-PONG)
+  // ======================
+  if(rezim === "chop"){
+
+    // Ping-pong terkonfirmasi >= 3: Lanjutkan ayunan
+    if(altSteps >= 3){
+      const nextAlt = cats[0] === "Besar" ? "Kecil" : "Besar";
+      return {
+        tebakan: nextAlt,
+        pola: "⚡ Ping-Pong (" + altSteps + "x) | Rezim: Chop",
+        level: currentMartingaleLevel,
+        signalText: "L" + currentMartingaleLevel + " • PING-PONG"
+      };
+    }
+
+    // Chop tapi ada naga >= 2: Ikuti naga (naga sementara dalam chop)
+    if(streak >= 2){
+      return {
+        tebakan: cats[0],
+        pola: "🔥 Naga Sementara (" + streak + "x) | Rezim: Chop",
+        level: currentMartingaleLevel,
+        signalText: "L" + currentMartingaleLevel + " • NAGA DALAM CHOP"
+      };
+    }
+
+    // SAME-SIDE MARTINGALE dalam chop: Jika L2/L3 di tengah chop,
+    // ambil kebalikan karena chop market cenderung berbalik
+    if(currentMartingaleLevel >= 2 && lastPrediksi){
+      const kompensasi = lastPrediksi === "Besar" ? "Kecil" : "Besar";
+      return {
+        tebakan: kompensasi,
+        pola: "🔄 Kompensasi Chop (" + kompensasi + ") | Rezim: Chop",
+        level: currentMartingaleLevel,
+        signalText: "L" + currentMartingaleLevel + " • BALIK " + kompensasi
+      };
+    }
+
+    // Default chop: Ikuti kebalikan
+    const opposite = cats[0] === "Besar" ? "Kecil" : "Besar";
+    return {
+      tebakan: opposite,
+      pola: "↔️ Ayun Chop (" + opposite + ") | Rezim: Chop",
+      level: currentMartingaleLevel,
+      signalText: "L" + currentMartingaleLevel + " • AYUN"
+    };
+  }
+
+  // Fallback
   return {
     tebakan: cats[0],
     pola: "👥 Pasangan Baru (" + cats[0] + ")",
@@ -476,11 +550,15 @@ function isiHasil(tr, hasil){
   const statusCell = tr.querySelector(".status");
   const prediksi = tr.dataset.prediksi || tr.children[1].innerText;
 
+  // Simpan prediksi terakhir untuk Same-Side Martingale
+  lastPrediksi = prediksi;
+
   if(prediksi === kat){
     statusCell.innerText = "WIN";
     statusCell.className = "status win";
     totalWin++;
     currentMartingaleLevel = 1; // RESET KE L1 SAAT WIN
+    lastPrediksi = null; // Reset setelah WIN
   } else {
     statusCell.innerText = "LOSE";
     statusCell.className = "status lose";
