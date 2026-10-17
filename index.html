@@ -892,38 +892,31 @@ function mulaiCountdown(){
   }, 1000);
 }
 
-// Muat arsip riwayat historis dari riwayat.json
+// Muat arsip riwayat historis: utamakan arsip segar dari repo utama,
+// file lokal data/riwayat.json hanya sebagai cadangan bila gagal.
 async function loadArchive(){
-  try{
-    const res = await fetch("/data/riwayat.json?t=" + Date.now());
-    if(res.ok){
-      const data = await res.json();
-      if(Array.isArray(data)){
-        archiveHistory = data.map(d => ({
-          issue: String(d.p).slice(-5),
-          fullIssue: String(d.p),
-          kategori: kategori(d.h),
-          angka: d.h
-        }));
-        console.log("Arsip riwayat lokal aktif:", archiveHistory.length, "ronde");
-      }
-    }
-  }catch(e){
-    console.log("Fallback online archive...");
+  const toRows = (data) => data.map(d => ({
+    issue: String(d.p).slice(-5),
+    fullIssue: String(d.p),
+    kategori: kategori(d.h),
+    angka: d.h
+  }));
+  const sources = [
+    "https://raw.githubusercontent.com/Rifkyharunac/55five/main/data/riwayat.json?t=" + Date.now(),
+    "/data/riwayat.json?t=" + Date.now()
+  ];
+  for(const url of sources){
     try{
-      const res2 = await fetch("https://raw.githubusercontent.com/Rifkyharunac/55five/main/data/riwayat.json");
-      if(res2.ok){
-        const data2 = await res2.json();
-        if(Array.isArray(data2)){
-          archiveHistory = data2.map(d => ({
-            issue: String(d.p).slice(-5),
-            fullIssue: String(d.p),
-            kategori: kategori(d.h),
-            angka: d.h
-          }));
+      const res = await fetch(url);
+      if(res.ok){
+        const data = await res.json();
+        if(Array.isArray(data)){
+          archiveHistory = toRows(data);
+          console.log("Arsip riwayat aktif:", archiveHistory.length, "ronde dari", url.split("?")[0]);
+          return;
         }
       }
-    }catch(err){}
+    }catch(e){}
   }
 }
 
